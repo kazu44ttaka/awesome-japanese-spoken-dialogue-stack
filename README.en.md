@@ -38,14 +38,15 @@ A curated list of **Japanese speech recognition (ASR), speech synthesis (TTS) an
 | [Kotoba-Whisper v2.2](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) | Kotoba Technologies | dedicated | — | Transformers, faster-whisper, whisper.cpp | ~756M | Apache-2.0 | yes | Japanese distilled Whisper; CER 0.133 ([results](benchmarks/asr/2026-08-jsut20.md)) |
 | [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | OpenAI | multilingual | — | faster-whisper, whisper.cpp, Transformers | 809M | MIT | yes | Baseline; CER 0.119, slow on CPU (~9 s per utterance) ([results](benchmarks/asr/2026-08-jsut20.md)) |
 | [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | Microsoft | multilingual | — | PyTorch | ~8B | TBD | TBD | Long-form (60 min) with speakers and timestamps; not measured |
+| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | Moonshine AI (Useful Sensors) | dedicated | — | Transformers, ONNX | 27M | Moonshine Community License (non-English models are non-commercial) | no | Only 27M, yet CER 0.078 with punctuation (0.052 without); 145 ms per utterance on CPU ([results](benchmarks/asr/2026-11-jsut20.md)) |
+| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | IBM | multilingual | — | Transformers (>=5.16), transcribe.cpp (GGUF) | 470M (encoder-only CTC) | Apache-2.0 | yes | 7 languages (Japanese added 2026-10). 18 ms per utterance on GPU; rarely outputs commas (CER 0.065 without punctuation). The -nc variant did not handle Japanese ([results](benchmarks/asr/2026-11-jsut20.md)) |
+| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Alibaba (FunAudioLLM) | multilingual | — | funasr (PyTorch) | ~0.8B | Apache-2.0 | yes | 31-language version of Fun-ASR-Nano; CER 0.090 (0.069 without punctuation), slightly below the Japanese-focused model ([results](benchmarks/asr/2026-11-jsut20.md)) |
 
 ### Not yet evaluated
 
 | Model | Notes |
 |---|---|
-| [Fun-ASR-MLT-Nano](https://github.com/QwenAudio/Fun-ASR) | Multilingual variant of Fun-ASR-Nano |
-| [Moonshine](https://github.com/moonshine-ai/moonshine) | Small and fast; check for a Japanese model and its license |
-| [Granite Speech](https://huggingface.co/ibm-granite) | IBM; check Japanese support |
+| [Parakeet 1.1B RNNT Multilingual](https://build.nvidia.com/nvidia/parakeet-1_1b-rnnt-multilingual-asr) | Multilingual incl. Japanese, distributed via NVIDIA NIM/NGC (not the English 1.1B on Hugging Face) |
 
 ## TTS
 
@@ -71,12 +72,16 @@ For Japanese knowledge and reasoning, see the existing leaderboards:
 - [Nejumi LLM Leaderboard](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA)
 - [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html)
 
-We plan to measure what matters for dialogue — **time to first token and tokens per second** — on a local GPU ([benchmarks/llm/](benchmarks/llm/)).
+We measure what matters for dialogue — **time to first token and tokens per second** — on a local GPU ([benchmarks/llm/2026-11-lmstudio.md](benchmarks/llm/2026-11-lmstudio.md)).
 
 | Model | Developer | Japanese | Streaming | Runtime | Size | License | Commercial | Notes |
 |---|---|---|---|---|---|---|---|---|
-| [Gemma 4 12B（QAT）](https://huggingface.co/google) | Google | multilingual | yes | LM Studio, llama.cpp, Ollama | 12B | TBD | TBD | Default in MaAI-SDS (LM Studio); not measured |
-| [Qwen3.5-35B-A3B](https://huggingface.co/Qwen) | Alibaba (Qwen) | multilingual | yes | vLLM, llama.cpp, LM Studio | 35B (MoE, active 3B) | TBD | TBD | MoE with small active parameters, fast responses; not measured |
+| [LFM2.5 1.2B JP](https://huggingface.co/LiquidAI) | Liquid AI | multilingual | yes | LM Studio, llama.cpp (GGUF) | 1.2B | TBD | TBD | Fastest we measured (TTFT 39 ms, 215 tok/s at Q8_0) ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| [ELYZA-Shortcut-1.0-Qwen-7B](https://huggingface.co/elyza) | ELYZA | multilingual | yes | LM Studio, llama.cpp (GGUF) | 7B | TBD | TBD | Japanese model from ELYZA (Qwen-based); TTFT 45 ms despite 7B ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| [Qwen3.5（0.8B / 4B / 9B）](https://huggingface.co/Qwen) | Alibaba (Qwen) | multilingual | yes | LM Studio, llama.cpp (GGUF) | 0.8B / 4B / 9B | TBD | TBD | Turn thinking off (reasoning_effort none); 9B: TTFT 107 ms, 56 tok/s ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| [Gemma 4（E2B / E4B / 12B / 26B-A4B）](https://huggingface.co/google) | Google | multilingual | yes | LM Studio, llama.cpp (GGUF) | 2B-26B (26B is MoE, 4B active) | TBD | TBD | The 26B-A4B MoE beats the dense 12B (TTFT 103 ms, 94 tok/s); turn thinking off for 12B QAT ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| [LLM-jp-4 8B Instruct](https://huggingface.co/llm-jp) | NII LLM-jp | multilingual | yes | LM Studio, llama.cpp (GGUF) | 8B | TBD | TBD | Japanese-centric model from Japan; TTFT 101 ms, 63 tok/s ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| [Nemotron Nano 9B v2 Japanese](https://huggingface.co/nvidia) | NVIDIA | multilingual | yes | LM Studio, llama.cpp (GGUF) | 9B | TBD | TBD | Thinking cannot be turned off via the API; ~1.5 s to reply even with /no_think ([results](benchmarks/llm/2026-11-lmstudio.md)) |
 
 ## Spoken dialogue (VAD, turn-taking, backchannels)
 
@@ -90,9 +95,9 @@ We plan to measure what matters for dialogue — **time to first token and token
 
 | Target | What | Results |
 |---|---|---|
-| ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [benchmarks/asr/2026-08-jsut20.md](benchmarks/asr/2026-08-jsut20.md) (Japanese) |
+| ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
 | TTS | Long-text RTF (synthesis time / audio length), memory, ASR round-trip check | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) (Japanese) |
-| LLM | Planned | [benchmarks/llm/](benchmarks/llm/) |
+| LLM | Time to first token and tokens/s for dialogue replies (LM Studio, 10 models) | [2026-11](benchmarks/llm/2026-11-lmstudio.md) (Japanese) |
 
 Method and test machine: [benchmarks/README.md](benchmarks/README.md).
 

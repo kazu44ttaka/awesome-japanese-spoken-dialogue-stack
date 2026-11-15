@@ -43,7 +43,7 @@
 - [Nejumi LLM リーダーボード](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA)
 - [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html)
 
-ここでは音声対話で効く **最初のトークンまでの時間・トークンの出る速さ** を、手元の GPU で測っていく予定です（[benchmarks/llm/](benchmarks/llm/)）。
+ここでは音声対話で効く **最初の文字までの時間・文字の出る速さ** を手元の GPU で測っています（[benchmarks/llm/2026-11-lmstudio.md](benchmarks/llm/2026-11-lmstudio.md)）。
 
 <!-- table:llm -->
 
@@ -55,9 +55,9 @@
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
-| ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [benchmarks/asr/2026-08-jsut20.md](benchmarks/asr/2026-08-jsut20.md) |
+| ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |
 | TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) |
-| LLM | 準備中 | [benchmarks/llm/](benchmarks/llm/) |
+| LLM | 音声対話での最初の文字までの時間（TTFT）と文字の出る速さ（LM Studio・10 モデル） | [2026-11](benchmarks/llm/2026-11-lmstudio.md) |
 
 測り方と測定環境は [benchmarks/README.md](benchmarks/README.md) にまとめています。
 

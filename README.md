@@ -38,14 +38,15 @@
 | [Kotoba-Whisper v2.2](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) | Kotoba Technologies | 専用 | — | Transformers, faster-whisper, whisper.cpp | 約 756M | Apache-2.0 | 可 | 日本語特化の蒸留 Whisper。CER 0.133 （[測定](benchmarks/asr/2026-08-jsut20.md)） |
 | [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | OpenAI | 多言語 | — | faster-whisper, whisper.cpp, Transformers | 809M | MIT | 可 | 比較の基準に。CER 0.119。CPU では遅い（1 発話 約 9 秒） （[測定](benchmarks/asr/2026-08-jsut20.md)） |
 | [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | Microsoft | 多言語 | — | PyTorch | 約 8B | 要確認 | 要確認 | 60 分級の長い音声を話者・時刻つきで書き起こす。未測定 |
+| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | Moonshine AI (Useful Sensors) | 専用 | — | Transformers, ONNX | 27M | Moonshine Community License（英語以外のモデルは非商用） | 不可 | 27M と極小なのに句読点ありで CER 0.078（句読点なし 0.052）。CPU で 1 発話 145 ms （[測定](benchmarks/asr/2026-11-jsut20.md)） |
+| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | IBM | 多言語 | — | Transformers (>=5.16), transcribe.cpp (GGUF) | 470M（エンコーダのみ・CTC） | Apache-2.0 | 可 | 7 言語（2026-10 に日本語対応）。GPU で 1 発話 18 ms と非常に速い。読点をほぼ出さない（句読点なし CER 0.065）。-nc 版は日本語非対応だった （[測定](benchmarks/asr/2026-11-jsut20.md)） |
+| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Alibaba (FunAudioLLM) | 多言語 | — | funasr (PyTorch) | 約 0.8B | Apache-2.0 | 可 | Fun-ASR-Nano の 31 言語版。CER 0.090（句読点なし 0.069）で日本語専用版よりわずかに低い （[測定](benchmarks/asr/2026-11-jsut20.md)） |
 
 ### 未評価の候補
 
 | モデル | メモ |
 |---|---|
-| [Fun-ASR-MLT-Nano](https://github.com/QwenAudio/Fun-ASR) | Fun-ASR-Nano の多言語版 |
-| [Moonshine](https://github.com/moonshine-ai/moonshine) | 軽量・低遅延。日本語モデルの有無とライセンスを確認する |
-| [Granite Speech](https://huggingface.co/ibm-granite) | IBM。日本語対応を確認する |
+| [Parakeet 1.1B RNNT Multilingual](https://build.nvidia.com/nvidia/parakeet-1_1b-rnnt-multilingual-asr) | 日本語を含む多言語版。NVIDIA NIM / NGC での配布（Hugging Face の英語版 1.1B とは別物） |
 
 ## TTS（音声合成）
 
@@ -71,12 +72,16 @@
 - [Nejumi LLM リーダーボード](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA)
 - [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html)
 
-ここでは音声対話で効く **最初のトークンまでの時間・トークンの出る速さ** を、手元の GPU で測っていく予定です（[benchmarks/llm/](benchmarks/llm/)）。
+ここでは音声対話で効く **最初の文字までの時間・文字の出る速さ** を手元の GPU で測っています（[benchmarks/llm/2026-11-lmstudio.md](benchmarks/llm/2026-11-lmstudio.md)）。
 
 | モデル | 開発元 | 日本語 | ストリーミング | 動かし方 | 大きさ | ライセンス | 商用 | メモ |
 |---|---|---|---|---|---|---|---|---|
-| [Gemma 4 12B（QAT）](https://huggingface.co/google) | Google | 多言語 | ○ | LM Studio, llama.cpp, Ollama | 12B | 要確認 | 要確認 | MaAI-SDS の既定（LM Studio）。未測定 |
-| [Qwen3.5-35B-A3B](https://huggingface.co/Qwen) | Alibaba (Qwen) | 多言語 | ○ | vLLM, llama.cpp, LM Studio | 35B（MoE・活性 3B） | 要確認 | 要確認 | MoE で活性パラメータが小さく、応答が速い。未測定 |
+| [LFM2.5 1.2B JP](https://huggingface.co/LiquidAI) | Liquid AI | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 1.2B | 要確認 | 要確認 | 測った中で最も速い（TTFT 39 ms・215 tok/s、Q8_0） （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
+| [ELYZA-Shortcut-1.0-Qwen-7B](https://huggingface.co/elyza) | ELYZA | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 7B | 要確認 | 要確認 | ELYZA の日本語モデル（Qwen ベース）。7B なのに TTFT 45 ms （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
+| [Qwen3.5（0.8B / 4B / 9B）](https://huggingface.co/Qwen) | Alibaba (Qwen) | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 0.8B / 4B / 9B | 要確認 | 要確認 | thinking を切る必要あり（reasoning_effort none）。9B で TTFT 107 ms・56 tok/s （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
+| [Gemma 4（E2B / E4B / 12B / 26B-A4B）](https://huggingface.co/google) | Google | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 2B〜26B（26B は MoE・活性 4B） | 要確認 | 要確認 | MoE の 26B-A4B は 12B より速い（TTFT 103 ms・94 tok/s）。12B QAT は thinking を切る必要あり （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
+| [LLM-jp-4 8B Instruct](https://huggingface.co/llm-jp) | 国立情報学研究所 LLM-jp | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 8B | 要確認 | 要確認 | 日本語中心の国産モデル。TTFT 101 ms・63 tok/s （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
+| [Nemotron Nano 9B v2 Japanese](https://huggingface.co/nvidia) | NVIDIA | 多言語 | ○ | LM Studio, llama.cpp (GGUF) | 9B | 要確認 | 要確認 | API から thinking を切れず、/no_think でも返事まで約 1.5 秒 （[測定](benchmarks/llm/2026-11-lmstudio.md)） |
 
 ## 音声対話の周辺（発話区間検出・ターンテイキング・相槌）
 
@@ -90,9 +95,9 @@
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
-| ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [benchmarks/asr/2026-08-jsut20.md](benchmarks/asr/2026-08-jsut20.md) |
+| ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |
 | TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) |
-| LLM | 準備中 | [benchmarks/llm/](benchmarks/llm/) |
+| LLM | 音声対話での最初の文字までの時間（TTFT）と文字の出る速さ（LM Studio・10 モデル） | [2026-11](benchmarks/llm/2026-11-lmstudio.md) |
 
 測り方と測定環境は [benchmarks/README.md](benchmarks/README.md) にまとめています。
 

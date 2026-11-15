@@ -55,6 +55,7 @@ EN_REPLACE = {
     "配布一式": "full download",
     "コーデック": "codec",
     "京都大学": "Kyoto University",
+    "国立情報学研究所 LLM-jp": "NII LLM-jp",
     "エンジン": "engine",
     "重み": "weights",
     "活性": "active",

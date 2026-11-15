@@ -23,8 +23,9 @@
 ## ページ
 
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間
+- [asr/2026-11-jsut20.md](asr/2026-11-jsut20.md) — 新しい候補（Moonshine・Granite・Fun-ASR-MLT）と、句読点を除いた CER
 - [tts/2026-08-19.md](tts/2026-08-19.md) — TTS 9 候補の速度・メモリ・ASR 検査
-- [llm/](llm/) — 準備中
+- [llm/2026-11-lmstudio.md](llm/2026-11-lmstudio.md) — LLM 10 モデルの最初の文字までの時間と速さ（LM Studio）
 
 ## 評価データ
 
@@ -32,4 +33,15 @@
 
 ## 測定スクリプト
 
-スクリプトは [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) の `benchmarks/` で作ったものを、手元のパスを取り除いてからここへ移す予定です。
+- [asr/scripts/eval_asr.py](asr/scripts/eval_asr.py) — ASR の CER（句読点あり・なし）と処理時間
+- [llm/scripts/bench_llm.py](llm/scripts/bench_llm.py) — LLM の最初の文字までの時間と速さ（OpenAI 互換 API）
+
+2026-08 の測定に使ったスクリプトは [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) の `benchmarks/` にあり、手元のパスを取り除いてからここへ移す予定です。
+
+環境は `uv venv` で作り、torch（CUDA 12.8）・transformers 5.16 以降・funasr を入れる:
+
+```
+uv venv --python 3.11 .venv
+uv pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+uv pip install "transformers>=5.16" funasr soundfile numpy accelerate sentencepiece
+```

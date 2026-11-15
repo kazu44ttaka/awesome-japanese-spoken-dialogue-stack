@@ -43,7 +43,7 @@ For Japanese knowledge and reasoning, see the existing leaderboards:
 - [Nejumi LLM Leaderboard](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA)
 - [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html)
 
-We plan to measure what matters for dialogue — **time to first token and tokens per second** — on a local GPU ([benchmarks/llm/](benchmarks/llm/)).
+We measure what matters for dialogue — **time to first token and tokens per second** — on a local GPU ([benchmarks/llm/2026-11-lmstudio.md](benchmarks/llm/2026-11-lmstudio.md)).
 
 <!-- table:llm -->
 
@@ -55,9 +55,9 @@ We plan to measure what matters for dialogue — **time to first token and token
 
 | Target | What | Results |
 |---|---|---|
-| ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [benchmarks/asr/2026-08-jsut20.md](benchmarks/asr/2026-08-jsut20.md) (Japanese) |
+| ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
 | TTS | Long-text RTF (synthesis time / audio length), memory, ASR round-trip check | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) (Japanese) |
-| LLM | Planned | [benchmarks/llm/](benchmarks/llm/) |
+| LLM | Time to first token and tokens/s for dialogue replies (LM Studio, 10 models) | [2026-11](benchmarks/llm/2026-11-lmstudio.md) (Japanese) |
 
 Method and test machine: [benchmarks/README.md](benchmarks/README.md).
 
