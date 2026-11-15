@@ -9,3 +9,5 @@ data/run_*
 data/chain*.sh
 apps/tts_engines.toml
 .venv-tts/
+data/*.log
+data/setup_*.sh
