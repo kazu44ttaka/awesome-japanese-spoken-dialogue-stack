@@ -11,3 +11,5 @@ apps/tts_engines.toml
 .venv-tts/
 data/*.log
 data/setup_*.sh
+apps/asr_engines.toml
+.venv-qwen-asr/

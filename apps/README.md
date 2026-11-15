@@ -20,6 +20,15 @@ uv pip install --python .venv "transformers>=5.16" funasr
 
 sherpa-onnx のモデル（Nemotron を含む）は、選んで「読み込み」を押すと models/ に自動でダウンロードする。
 
+追加の準備が要るエンジン（場所やプロジェクトは `apps/asr_engines.example.toml` を `apps/asr_engines.toml` にコピーして書く）:
+
+| エンジン | 追加で入れるもの |
+|---|---|
+| faster-whisper | `uv pip install --python .venv faster-whisper` |
+| Nemotron（NeMo・PyTorch） | NeMo 用の別の環境（`nemo-toolkit[asr]==3.0.0`）。アプリがその環境でサーバーを起動して TCP でつなぐ |
+| Qwen3-ASR（PyTorch） | `qwen-asr` は transformers 4.57 を要求して Granite（5.16 以上）とぶつかるので、別の環境 `.venv-qwen-asr` に入れて、その環境でアプリや測定を動かす |
+| Chirp 3（Google Cloud） | `google-cloud-speech`。`gcloud auth application-default login` でログインし、プロジェクト ID を書く。料金がかかる |
+
 ## TTS デモ
 
 エンジンごとに必要なものが違い、ライブラリの版もぶつかりやすいので、ASR とは別の環境（`.venv-tts`）を作る。

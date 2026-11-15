@@ -1,0 +1,16 @@
+# ASR デモ・測定で使う、追加の設定が要るエンジン。apps/asr_engines.toml にコピーして書き換える（git に入らない）。
+
+# Nemotron 3.5 streaming を NeMo（PyTorch）で動かす。nemo-toolkit は依存が重いので別の環境に入れる:
+#   uv venv --python 3.11 .venv-nemo
+#   uv pip install --python .venv-nemo torch --index-url https://download.pytorch.org/whl/cu128
+#   uv pip install --python .venv-nemo "nemo-toolkit[asr]==3.0.0"
+[nemotron_nemo]
+python = ".venv-nemo/Scripts/python.exe"
+chunk_ms = 560      # 80 / 160 / 320 / 560 / 1120
+device = "cuda"
+
+# Google Cloud Speech-to-Text V2 の Chirp 3（料金がかかる）。認証は gcloud auth application-default login
+[chirp3]
+project = ""         # 空なら環境変数 GOOGLE_CLOUD_PROJECT
+location = "asia-northeast1"
+model = "chirp_3"

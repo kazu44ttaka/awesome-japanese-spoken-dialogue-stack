@@ -54,6 +54,10 @@ class Engine:
         def run() -> None:
             self.events.put(("status", f"{BACKENDS[name].label} を読み込み中…（初回はダウンロードに時間がかかります）"))
             try:
+                close = getattr(self.recognize, "close", None)  # 前のモデルが起動したサーバー（NeMo など）を止める
+                if callable(close):
+                    close()
+                self.recognize = self.streamer = None
                 t0 = time.perf_counter()
                 if BACKENDS[name].streaming:
                     streamer = create_streaming(name, threads=4)
@@ -292,6 +296,9 @@ class App:
 
     def _close(self) -> None:
         self.engine.stop()
+        close = getattr(self.engine.recognize, "close", None)
+        if callable(close):
+            close()
         self.root.destroy()
 
     def _poll(self) -> None:

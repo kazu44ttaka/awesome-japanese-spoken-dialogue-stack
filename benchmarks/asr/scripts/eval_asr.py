@@ -7,7 +7,8 @@
 
 評価用の音声と正解文はリポジトリに入れない（data/eval/ と data/results/ は .gitignore）。
 採点は scoring.py（3 種類の CER と 95% 信頼区間）。時間は 1 発話目で一度ウォームアップしてから測る。
-sherpa-onnx のモデルは --model-dir に k2-fsa の配布物のフォルダーを渡す。
+モデルの読み込み方は asrkit/backends.py（デモアプリと共通）。sherpa-onnx のモデルは
+--model-dir を省くと models/ に自動でダウンロードする（手元にあればそのフォルダーを渡す）。
 """
 
 from __future__ import annotations
@@ -15,7 +16,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import re
 import sys
 import tarfile
 import time
@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from scoring import score_pair, summarize  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[3]
@@ -127,153 +128,19 @@ def load_hf_set(name: str, subset: int, seed: int = 0) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------- backends
-class GraniteCTC:
-    """IBM Granite Speech 5.0 TurboCTC（transformers>=5.16、AutoModelForCTC）。"""
+# モデルの読み込み方は asrkit（デモアプリと共通）にある。sherpa-onnx のモデルは --model-dir を省くと
+# models/ に自動でダウンロードする。
+from asrkit.backends import BACKENDS as _INFO  # noqa: E402
+from asrkit.backends import create, create_streaming  # noqa: E402
 
-    def __init__(self, model_id: str, device: str) -> None:
-        import torch
-        from transformers import AutoModelForCTC, AutoProcessor
-
-        self.torch = torch
-        self.processor = AutoProcessor.from_pretrained(model_id)
-        self.model = AutoModelForCTC.from_pretrained(model_id).to(device).eval()
-        self.device = device
-
-    def __call__(self, audio: np.ndarray) -> str:
-        sr = self.processor.feature_extractor.sampling_rate
-        inputs = self.processor(audio, sampling_rate=sr, return_tensors="pt", device=self.device)
-        inputs = inputs.to(self.device, dtype=self.model.dtype)
-        with self.torch.inference_mode():
-            outputs = self.model.generate(**inputs)
-        return self.processor.batch_decode(outputs, skip_special_tokens=True)[0]
-
-
-class Moonshine:
-    """Moonshine（transformers の MoonshineForConditionalGeneration）。"""
-
-    def __init__(self, model_id: str, device: str) -> None:
-        import torch
-        from transformers import AutoProcessor, MoonshineForConditionalGeneration
-
-        self.torch = torch
-        self.dtype = torch.float16 if device.startswith("cuda") else torch.float32
-        self.processor = AutoProcessor.from_pretrained(model_id)
-        self.model = MoonshineForConditionalGeneration.from_pretrained(model_id).to(device, self.dtype).eval()
-        self.device = device
-
-    def __call__(self, audio: np.ndarray) -> str:
-        sr = self.processor.feature_extractor.sampling_rate
-        inputs = self.processor(audio, sampling_rate=sr, return_tensors="pt").to(self.device, self.dtype)
-        # 公式の例と同じく、音声 1 秒あたり 13 トークンを上限にする（繰り返しの暴走を防ぐ）
-        max_length = int((inputs.attention_mask.sum(dim=-1) * (13 / sr)).max().item())
-        with self.torch.inference_mode():
-            ids = self.model.generate(**inputs, max_length=max(8, max_length))
-        return self.processor.decode(ids[0], skip_special_tokens=True)
-
-
-class FunASRNano:
-    """Fun-ASR-Nano / Fun-ASR-MLT-Nano（funasr の AutoModel）。"""
-
-    def __init__(self, model_id: str, device: str, language: str) -> None:
-        from funasr import AutoModel
-        from huggingface_hub import snapshot_download
-
-        local = Path(snapshot_download(model_id))
-        kwargs = {"trust_remote_code": True, "device": device, "disable_update": True}
-        if (local / "model.py").is_file():
-            kwargs["remote_code"] = str(local / "model.py")
-        self.model = AutoModel(model=str(local), **kwargs)
-        self.language = language
-
-    def __call__(self, audio: np.ndarray) -> str:
-        import torch
-
-        # funasr の Fun-ASR-Nano は音声を torch.Tensor かファイルパスでしか受け取らない
-        res = self.model.generate(
-            input=[torch.from_numpy(audio)], cache={}, batch_size=1, language=self.language, itn=True,
-            llm_kwargs={"do_sample": False},
-        )
-        text = str(res[0].get("text", "")) if res else ""
-        return re.sub(r"<\|[^|]+\|>", "", text)
-
-
-class WhisperHF:
-    """Whisper 系（transformers の pipeline。日本語・書き起こしを指定）。"""
-
-    def __init__(self, model_id: str, device: str) -> None:
-        import torch
-        from transformers import pipeline
-
-        dtype = torch.float16 if device.startswith("cuda") else torch.float32
-        self.pipe = pipeline("automatic-speech-recognition", model=model_id, dtype=dtype, device=device)
-
-    def __call__(self, audio: np.ndarray) -> str:
-        out = self.pipe({"raw": audio, "sampling_rate": 16000},
-                        generate_kwargs={"language": "ja", "task": "transcribe"})
-        return str(out.get("text", ""))
-
-
-class Sherpa:
-    """sherpa-onnx のオフライン認識（k2-fsa の配布物。CPU）。"""
-
-    def __init__(self, kind: str, model_dir: Path, threads: int) -> None:
-        import sherpa_onnx
-
-        d = Path(model_dir)
-        R = sherpa_onnx.OfflineRecognizer
-        if kind == "sensevoice":
-            self.rec = R.from_sense_voice(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
-                                          num_threads=threads, language="ja", use_itn=True)
-        elif kind == "parakeet-ctc":
-            self.rec = R.from_nemo_ctc(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
-                                       num_threads=threads)
-        elif kind == "reazonspeech-k2":
-            self.rec = R.from_transducer(
-                encoder=str(d / "encoder-epoch-99-avg-1.int8.onnx"), decoder=str(d / "decoder-epoch-99-avg-1.onnx"),
-                joiner=str(d / "joiner-epoch-99-avg-1.int8.onnx"), tokens=str(d / "tokens.txt"), num_threads=threads)
-        elif kind == "cohere":
-            self.rec = R.from_cohere_transcribe(encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
-                                                tokens=str(d / "tokens.txt"), num_threads=threads, language="ja",
-                                                use_punct=True, use_itn=True)
-        elif kind == "funasr-nano":
-            self.rec = R.from_funasr_nano(encoder_adaptor=str(d / "encoder_adaptor.int8.onnx"), llm=str(d / "llm.int8.onnx"),
-                                          embedding=str(d / "embedding.int8.onnx"), tokenizer=str(d / "Qwen3-0.6B"),
-                                          num_threads=threads, language="ja", itn=True, max_new_tokens=128)
-        else:
-            raise ValueError(kind)
-
-    def __call__(self, audio: np.ndarray) -> str:
-        stream = self.rec.create_stream()
-        stream.accept_waveform(16000, audio)
-        self.rec.decode_stream(stream)
-        return re.sub(r"<\|[^|]+\|>", "", stream.result.text)
+BACKENDS = list(_INFO) + ["granite-nc"]
 
 
 def make_backend(name: str, args: argparse.Namespace):
-    dev = args.device
-    table = {
-        "granite": lambda: GraniteCTC("ibm-granite/granite-speech-5.0-470m-turboctc", dev),
-        "granite-nc": lambda: GraniteCTC("ibm-granite/granite-speech-5.0-470m-turboctc-nc", dev),
-        "moonshine-tiny-ja": lambda: Moonshine("UsefulSensors/moonshine-tiny-ja", dev),
-        "fun-asr-mlt-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-MLT-Nano-2512", dev, "日文"),
-        "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", dev, "日文"),
-        "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", dev),
-        "kotoba-whisper-v2.0": lambda: WhisperHF("kotoba-tech/kotoba-whisper-v2.0", dev),
-    }
-    if name in table:
-        return table[name]()
-    if name.startswith("sherpa-"):
-        if not args.model_dir:
-            raise SystemExit(f"{name} には --model-dir（k2-fsa の配布物のフォルダー）が必要です")
-        return Sherpa(name[len("sherpa-"):], args.model_dir, args.threads)
-    raise SystemExit(f"unknown backend: {name}")
-
-
-BACKENDS = [
-    "granite", "granite-nc", "moonshine-tiny-ja", "fun-asr-mlt-nano", "fun-asr-nano",
-    "whisper-large-v3-turbo", "kotoba-whisper-v2.0",
-    "sherpa-sensevoice", "sherpa-parakeet-ctc", "sherpa-reazonspeech-k2", "sherpa-cohere", "sherpa-funasr-nano",
-]
+    info = _INFO.get(name)
+    if info is not None and info.streaming:
+        return create_streaming(name, threads=args.threads, model_dir=args.model_dir)
+    return create(name, device=args.device, threads=args.threads, model_dir=args.model_dir)
 
 
 def main() -> None:
@@ -324,7 +191,7 @@ def main() -> None:
     summary = {
         "backend": args.backend,
         "dataset": args.dataset or str(args.manifest),
-        "device": "cpu" if args.backend.startswith("sherpa-") else args.device,
+        "device": "cpu" if args.backend.startswith("sherpa-") or args.backend.startswith("nemotron-") and args.backend != "nemotron-nemo" else args.device,
         "load_s": round(load_s, 1),
         **summarize(results),
         "mean_ms": round(sum(ms_sorted) / len(ms_sorted), 1),

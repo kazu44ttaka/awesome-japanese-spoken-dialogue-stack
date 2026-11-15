@@ -10,7 +10,12 @@ sherpa-onnx のモデルは model_dir を省略すると models/ に自動でダ
 
 from __future__ import annotations
 
+import os
 import re
+import socket
+import subprocess
+import time
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -18,6 +23,16 @@ from typing import Callable
 import numpy as np
 
 from .models import ensure_sherpa_model
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def load_config(path: Path | None = None) -> dict:
+    """apps/asr_engines.toml（無ければ example）を読む。NeMo の環境や Chirp 3 のプロジェクトなど。"""
+    for candidate in ([path] if path else [REPO / "apps" / "asr_engines.toml", REPO / "apps" / "asr_engines.example.toml"]):
+        if candidate and candidate.is_file():
+            return tomllib.loads(candidate.read_text(encoding="utf-8"))
+    return {}
 
 
 @dataclass(frozen=True)
@@ -32,11 +47,17 @@ class BackendInfo:
 BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("nemotron-560ms", "Nemotron 3.5 streaming 0.6B・560 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
     BackendInfo("nemotron-80ms", "Nemotron 3.5 streaming 0.6B・80 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
+    BackendInfo("nemotron-nemo", "Nemotron 3.5 streaming 0.6B・NeMo（真のストリーミング・GPU・専用の環境）", "nemo", False, True),
     BackendInfo("sherpa-sensevoice", "SenseVoiceSmall（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-parakeet-ctc", "Parakeet TDT-CTC 0.6B 日本語（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-reazonspeech-k2", "ReazonSpeech k2-v2（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-cohere", "Cohere ASR 日本語（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-funasr-nano", "Fun-ASR-Nano（sherpa-onnx・CPU）", "sherpa-onnx", False),
+    BackendInfo("sherpa-qwen3-asr", "Qwen3-ASR 0.6B（sherpa-onnx・CPU）", "sherpa-onnx", False),
+    BackendInfo("faster-whisper", "Whisper large-v3-turbo（faster-whisper）", "faster-whisper", True),
+    BackendInfo("qwen3-asr-0.6b", "Qwen3-ASR 0.6B（qwen-asr・PyTorch）", "qwen-asr", True),
+    BackendInfo("qwen3-asr-1.7b", "Qwen3-ASR 1.7B（qwen-asr・PyTorch）", "qwen-asr", True),
+    BackendInfo("chirp3", "Google Chirp 3（クラウド・Speech-to-Text V2）", "google-cloud-speech", False),
     BackendInfo("moonshine-tiny-ja", "Moonshine tiny-ja（transformers）", "transformers", True),
     BackendInfo("granite", "Granite Speech 5.0 470M TurboCTC（transformers）", "transformers", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
@@ -154,6 +175,11 @@ class Sherpa:
             self.rec = R.from_cohere_transcribe(encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
                                                 tokens=str(d / "tokens.txt"), num_threads=threads, language="ja",
                                                 use_punct=True, use_itn=True)
+        elif kind == "qwen3-asr":
+            # int8 は CUDA に載せても MatMulInteger が CPU に落ちるので、CPU のまま使う
+            self.rec = R.from_qwen3_asr(conv_frontend=str(d / "conv_frontend.onnx"), encoder=str(d / "encoder.int8.onnx"),
+                                        decoder=str(d / "decoder.int8.onnx"), tokenizer=str(d / "tokenizer"),
+                                        num_threads=threads, sample_rate=16000, feature_dim=128)
         elif kind == "funasr-nano":
             self.rec = R.from_funasr_nano(encoder_adaptor=str(d / "encoder_adaptor.int8.onnx"), llm=str(d / "llm.int8.onnx"),
                                           embedding=str(d / "embedding.int8.onnx"), tokenizer=str(d / "Qwen3-0.6B"),
@@ -166,6 +192,142 @@ class Sherpa:
         stream.accept_waveform(16000, np.ascontiguousarray(audio, dtype=np.float32))
         self.rec.decode_stream(stream)
         return re.sub(r"<\|[^|]+\|>", "", stream.result.text)
+
+
+class FasterWhisper:
+    """faster-whisper（CTranslate2）。GPU は float16、CPU は int8。"""
+
+    def __init__(self, model_id: str, device: str) -> None:
+        from faster_whisper import WhisperModel
+
+        self.model = WhisperModel(model_id, device="cuda" if device.startswith("cuda") else "cpu",
+                                  compute_type="float16" if device.startswith("cuda") else "int8")
+
+    def __call__(self, audio: np.ndarray) -> str:
+        segments, _info = self.model.transcribe(np.ascontiguousarray(audio, dtype=np.float32), language="ja",
+                                                beam_size=1, vad_filter=False, condition_on_previous_text=False)
+        return "".join(s.text for s in segments)
+
+
+class Qwen3ASRTorch:
+    """Qwen3-ASR（qwen-asr パッケージの transformers 実装）。"""
+
+    def __init__(self, model_id: str, device: str) -> None:
+        import torch
+        from qwen_asr import Qwen3ASRModel
+
+        cuda = device.startswith("cuda")
+        self.model = Qwen3ASRModel.from_pretrained(model_id, dtype=torch.bfloat16 if cuda else torch.float32,
+                                                   device_map="cuda:0" if cuda else "cpu",
+                                                   max_inference_batch_size=1, max_new_tokens=256)
+
+    def __call__(self, audio: np.ndarray) -> str:
+        results = self.model.transcribe(audio=(np.ascontiguousarray(audio, dtype=np.float32), 16000), language="Japanese")
+        return str(results[0].text) if results else ""
+
+
+class Chirp3:
+    """Google Cloud Speech-to-Text V2 の Chirp 3（区間ごとに recognize。料金がかかる）。
+
+    認証は Application Default Credentials（gcloud auth application-default login）か
+    GOOGLE_APPLICATION_CREDENTIALS。プロジェクトは apps/asr_engines.toml の [chirp3] か GOOGLE_CLOUD_PROJECT。
+    """
+
+    def __init__(self, cfg: dict) -> None:
+        from google.api_core.client_options import ClientOptions
+        from google.cloud.speech_v2 import SpeechClient
+        from google.cloud.speech_v2.types import cloud_speech
+
+        self.types = cloud_speech
+        project = str(cfg.get("project", "") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")).strip()
+        if not project:
+            raise RuntimeError("Chirp 3 には Google Cloud のプロジェクト ID が要ります（asr_engines.toml か GOOGLE_CLOUD_PROJECT）")
+        location = str(cfg.get("location", "asia-northeast1"))
+        options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com") if location != "global" else None
+        self.client = SpeechClient(client_options=options)
+        self.recognizer = f"projects/{project}/locations/{location}/recognizers/_"
+        self.config = cloud_speech.RecognitionConfig(
+            explicit_decoding_config=cloud_speech.ExplicitDecodingConfig(
+                encoding=cloud_speech.ExplicitDecodingConfig.AudioEncoding.LINEAR16,
+                sample_rate_hertz=16000, audio_channel_count=1),
+            language_codes=["ja-JP"], model=str(cfg.get("model", "chirp_3")))
+
+    def __call__(self, audio: np.ndarray) -> str:
+        pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+        response = self.client.recognize(request=self.types.RecognizeRequest(
+            recognizer=self.recognizer, config=self.config, content=pcm))
+        return "".join(r.alternatives[0].transcript for r in response.results if r.alternatives)
+
+
+class NemoNemotron:
+    """Nemotron 3.5 streaming を NeMo（PyTorch）で動かす。MaAI-SDS と同じく専用の環境のサーバーに TCP でつなぐ。
+
+    NeMo は依存が重く nemo-toolkit==3.0.0 に固定が要るので、別の環境（apps/asr_engines.toml の
+    [nemotron_nemo] python）で asrkit/nemo/nemotron_asr_server.py を起動する。
+    使い方は NemotronStreaming と同じ（start / feed / finish）。
+    """
+
+    def __init__(self, cfg: dict) -> None:
+        from .nemo.nemotron_asr import encode_audio_f32, recv_frame, send_frame
+
+        self._enc, self._recv, self._send = encode_audio_f32, recv_frame, send_frame
+        python = str(cfg.get("python", "")).strip()
+        python_path = Path(python) if Path(python).is_absolute() else REPO / python
+        if not python or not python_path.is_file():
+            raise RuntimeError("apps/asr_engines.toml の [nemotron_nemo] python に、nemo-toolkit を入れた環境の python を書いてください")
+        self.chunk_ms = int(cfg.get("chunk_ms", 560))
+        with socket.socket() as s:  # 空いているポート
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        server = Path(__file__).resolve().parent / "nemo" / "nemotron_asr_server.py"
+        self.proc = subprocess.Popen(
+            [str(python_path), str(server), "--port", str(port), "--chunk-size", str(self.chunk_ms), "--lang", "ja-JP",
+             "--device", str(cfg.get("device", "cuda"))],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        deadline = time.monotonic() + float(cfg.get("load_timeout_sec", 300))
+        while True:  # モデルを読み込み終わると READY を出して待ち受ける
+            if time.monotonic() > deadline:
+                self.proc.terminate()
+                raise RuntimeError("NeMo のサーバーの起動がタイムアウトしました")
+            line = self.proc.stdout.readline()
+            if not line and self.proc.poll() is not None:
+                raise RuntimeError(f"NeMo のサーバーが終了しました（exit {self.proc.returncode}）")
+            if line.strip() == "READY":
+                break
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=60)
+        self.stream = None
+
+    def _call(self, req: dict) -> dict:
+        self._send(self.sock, req)
+        res = self._recv(self.sock)
+        if "error" in res:
+            raise RuntimeError(res["error"])
+        return res
+
+    def start(self) -> None:
+        self._call({"op": "reset"})
+        self.stream = True
+
+    def feed(self, audio: np.ndarray) -> str:
+        return str(self._call({"op": "feed", "audio_b64": self._enc(np.asarray(audio, dtype=np.float32))}).get("text", ""))
+
+    def finish(self) -> str:
+        text = str(self._call({"op": "finalize"}).get("text", ""))
+        self.stream = None
+        return text
+
+    def __call__(self, audio: np.ndarray) -> str:
+        self.start()
+        self.feed(audio)
+        return self.finish()
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        finally:
+            if self.proc.poll() is None:
+                self.proc.terminate()
 
 
 class NemotronStreaming:
@@ -216,7 +378,9 @@ class NemotronStreaming:
         return self.finish()
 
 
-def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None) -> NemotronStreaming:
+def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None, config: dict | None = None):
+    if name == "nemotron-nemo":
+        return NemoNemotron((config if config is not None else load_config()).get("nemotron_nemo", {}))
     chunk = {"nemotron-560ms": 560, "nemotron-80ms": 80}[name]
     return NemotronStreaming(chunk, threads, model_dir)
 
@@ -231,6 +395,10 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", device),
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),
         "kotoba-whisper-v2.0": lambda: WhisperHF("kotoba-tech/kotoba-whisper-v2.0", device),
+        "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device),
+        "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
+        "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
+        "chirp3": lambda: Chirp3(load_config().get("chirp3", {})),
     }
     if name in table:
         return table[name]()
