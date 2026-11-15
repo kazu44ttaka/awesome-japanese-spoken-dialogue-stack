@@ -1,7 +1,9 @@
 """日本語 TTS を選んで文を読み上げ、最初の音が出るまでの時間と速さを試す小さなアプリ。
 
-    uv pip install sounddevice soundfile      # ほかに使うエンジンの分（supertonic など）
     python apps/tts_demo.py
+
+エンジンの場所（モデル・実行ファイル・辞書など）は apps/tts_engines.toml に書く
+（apps/tts_engines.example.toml をコピー）。必要なパッケージと入れ方は README を参照。
 
 - AivisSpeech / VOICEVOX はエンジンを起動しておく（入っていれば「エンジンを起動」で起動できる。
   「GPU を使う」で --use_gpu を付ける。すでに起動しているエンジンはそのまま使う）
@@ -24,7 +26,7 @@ from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ttskit.backends import BACKENDS, VoicevoxCompatible, create, split_sentences  # noqa: E402
+from ttskit.backends import BACKENDS, VoicevoxCompatible, create, load_config, split_sentences  # noqa: E402
 
 SAMPLES = {
     "あいさつ": "こんにちは。今日はいい天気ですね。何かお手伝いできることはありますか？",
@@ -75,6 +77,7 @@ class App:
         root.geometry("900x640")
         self.events: queue.Queue = queue.Queue()
         self.tts = None
+        self.config = load_config()
         self.player = Player()
         self.cancel = threading.Event()
         self.last_audio: list[tuple[np.ndarray, int]] = []
@@ -137,6 +140,7 @@ class App:
 
         self._reset()
         root.after(50, self._poll)
+        root.protocol("WM_DELETE_WINDOW", self._close)
 
     # ---------------------------------------------------------------- helpers
     def _backend(self) -> str:
@@ -147,6 +151,7 @@ class App:
         self.text.insert("1.0", text)
 
     def _reset(self) -> None:
+        self._close_tts()
         self.tts = None
         self.speak_btn.configure(state="disabled")
         info = BACKENDS[self._backend()]
@@ -164,7 +169,7 @@ class App:
         def run() -> None:
             try:
                 t0 = time.perf_counter()
-                tts = create(name)
+                tts = create(name, self.config)
                 if not tts.available():
                     raise RuntimeError("エンジンにつながりません。エンジンを起動してから読み込んでください")
                 voices = tts.voices()
@@ -182,7 +187,7 @@ class App:
         self.status.configure(text="エンジンを起動しています…（1 分ほどかかることがあります）")
 
         def run() -> None:
-            engine = create(name)
+            engine = create(name, self.config)
             ok = isinstance(engine, VoicevoxCompatible) and engine.start_engine(use_gpu=self.gpu_var.get())
             self.events.put(("status", "エンジンが起動しました。「読み込み」を押してください" if ok
                              else "エンジンを起動できませんでした（既定の場所に入っていないかもしれません）"))
@@ -234,6 +239,16 @@ class App:
         self.cancel.set()
         self.player.stop()
 
+    def _close_tts(self) -> None:
+        close = getattr(self.tts, "close", None)  # アプリが起動したサーバーを止める
+        if callable(close):
+            close()
+
+    def _close(self) -> None:
+        self._stop()
+        self._close_tts()
+        self.root.destroy()
+
     def _save(self) -> None:
         if not self.last_audio:
             return
@@ -253,6 +268,7 @@ class App:
                 if kind == "status":
                     self.status.configure(text=data[0])
                 elif kind == "loaded":
+                    self._close_tts()
                     self.tts, voices, secs = data
                     self.voice_ids = [v for v, _l in voices]
                     self.voice_box.configure(values=[label for _v, label in voices])

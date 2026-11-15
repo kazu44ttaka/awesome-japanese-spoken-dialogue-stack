@@ -96,16 +96,15 @@ We measure what matters for dialogue — **time to first token and tokens per se
 
 - **Minimal inference examples**: [examples/asr/](examples/asr/) — one standalone script per model that transcribes a WAV file
 - **Microphone demo app**: [apps/asr_demo.py](apps/asr_demo.py) — pick a model and speak; utterances are segmented with Silero VAD and finalized, with optional interim results (pseudo-streaming). Shows recognition time and the delay from the end of speech to the text. Nemotron 3.5 streaming runs as true streaming (incremental input with carried-over state)
-- **TTS demo app**: [apps/tts_demo.py](apps/tts_demo.py) — pick an engine (AivisSpeech, VOICEVOX, Supertonic 3, Qwen3-TTS) and a voice and read text aloud. "Synthesize per sentence and play as soon as each is ready" shows the time to first audio, which is what matters in dialogue. AivisSpeech / VOICEVOX can be launched from the app if installed
+- **TTS demo app**: [apps/tts_demo.py](apps/tts_demo.py) — pick an engine (AivisSpeech, VOICEVOX, VOICEVOX Core, Irodori-TTS, Supertonic 3, mio-tts-cpp, Qwen3-TTS, Tsukasa, Kokoro) and a voice and read text aloud. "Synthesize per sentence and play as soon as each is ready" shows the time to first audio, which is what matters in dialogue. AivisSpeech / VOICEVOX can be launched from the app if installed. Setup: [apps/README.md](apps/README.md)
 
 ```
 uv venv --python 3.11 .venv
 uv pip install sherpa-onnx sounddevice soundfile numpy      # enough for the sherpa-onnx models (no PyTorch)
 uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # for transformers / funasr models
 uv pip install "transformers>=5.16" funasr
-uv pip install supertonic                                    # for Supertonic 3 (TTS)
 python apps/asr_demo.py
-python apps/tts_demo.py
+.venv-tts/Scripts/python apps/tts_demo.py   # TTS uses its own environment (apps/README.md)
 ```
 
 ## Benchmarks

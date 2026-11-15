@@ -1,0 +1,55 @@
+# TTS デモ（apps/tts_demo.py）のエンジン設定の例。
+# apps/tts_engines.toml にコピーして、手元の場所に合わせて書き換える（tts_engines.toml は git に入らない）。
+# 相対パスはリポジトリのフォルダーから見た場所。使わないエンジンの節は消してよい。
+
+[aivisspeech]
+url = "http://127.0.0.1:10101"
+
+[voicevox]
+url = "http://127.0.0.1:50021"
+
+# VOICEVOX Core（エンジンを起動せず、アプリの中で動かす）
+# voicevox_core の配布元のダウンローダー（download-windows-x64.exe）で取った一式のフォルダー。
+# 中に onnxruntime/lib/、dict/open_jtalk_dic_utf_8-1.11/、models/vvms/*.vvm がある
+[voicevox_core]
+runtime_dir = "voicevox_runtime"
+acceleration = "CPU"   # CPU / GPU / AUTO（GPU は CUDA か DirectML 版のランタイムが要る）
+
+# Irodori-TTS（GPU 推奨）。声は文章で指定する（キャプション）。
+[irodori]
+checkpoint = "Aratako/Irodori-TTS-v4.1-Small"
+device = "cuda"
+steps = 40
+captions = [
+  "明るく自然な日本語の声",
+  "落ち着いた低めの男性の声",
+  "元気で若い女性の声",
+  "ささやくような優しい声",
+]
+
+# mio-tts-cpp のサーバー（mio-tts-server）。起動済みならつなぐだけ。
+# server_exe とモデルを書いておくと、つながらないときにアプリが起動する
+[mio]
+url = "http://127.0.0.1:18089"
+server_exe = "mio-tts-cpp/build/mio-tts-server.exe"
+model = "mio-tts-cpp/models/MioTTS-0.1B-Q8_0.gguf"
+vocoder = "mio-tts-cpp/models/miocodec.gguf"
+wavlm = "mio-tts-cpp/models/wavlm_base_plus_2l_f32.gguf"
+references = { jp_female = "mio-tts-cpp/models/jp_female.emb.gguf", jp_male = "mio-tts-cpp/models/jp_male.emb.gguf" }
+
+# Qwen3-TTS を audio.cpp のサーバー（audiocpp_server）で動かす（CUDA。PyTorch 版より速い）
+[qwen3_tts_cpp]
+url = "http://127.0.0.1:18081"
+server_exe = "audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe"
+model = "audio.cpp/models/Qwen3-TTS-12Hz-1.7B-CustomVoice-GGUF/qwen3-tts-12hz-1.7b-customvoice-q8_0.gguf"
+voices = ["Ono_Anna", "Vivian", "Serena", "Ryan"]   # 日本語は Ono_Anna
+
+# Tsukasa Speech（非商用 CC-BY-NC-4.0）。Hugging Face の Respair/Tsukasa_Speech を置いたフォルダーと、
+# 声をまねる参照音声（自分の声など、使ってよい WAV）
+[tsukasa]
+root = "Tsukasa-HF"
+reference_audio = ""
+
+# Kokoro（日本語は読みが崩れやすい。比較用）
+[kokoro]
+voices = ["jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"]

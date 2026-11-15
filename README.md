@@ -96,16 +96,15 @@
 
 - **最小の推論例**：[examples/asr/](examples/asr/) — WAV を 1 つ渡すと書き起こすだけの、モデルごとのスクリプト（単独で動く）
 - **マイクで試すアプリ**：[apps/asr_demo.py](apps/asr_demo.py) — モデルを選び、話した声をその場で認識する。発話区間検出（Silero VAD）で区切って確定し、話している途中の経過も出せる（疑似ストリーミング）。認識にかかった時間と、話し終わりから表示までの時間を表示する。Nemotron 3.5 streaming は真のストリーミング（音声を少しずつ入れて内部状態を引き継ぐ）で動く
-- **TTS を試すアプリ**：[apps/tts_demo.py](apps/tts_demo.py) — エンジン（AivisSpeech・VOICEVOX・Supertonic 3・Qwen3-TTS）と声を選んで読み上げる。「文ごとに合成して、できた文から再生」で、最初の音が出るまでの時間（音声対話で効く）を確かめられる。AivisSpeech / VOICEVOX は入っていればアプリから起動できる
+- **TTS を試すアプリ**：[apps/tts_demo.py](apps/tts_demo.py) — エンジン（AivisSpeech・VOICEVOX・VOICEVOX Core・Irodori-TTS・Supertonic 3・mio-tts-cpp・Qwen3-TTS・Tsukasa・Kokoro）と声を選んで読み上げる。「文ごとに合成して、できた文から再生」で、最初の音が出るまでの時間（音声対話で効く）を確かめられる。AivisSpeech / VOICEVOX は入っていればアプリから起動できる。入れ方は [apps/README.md](apps/README.md)
 
 ```
 uv venv --python 3.11 .venv
 uv pip install sherpa-onnx sounddevice soundfile numpy      # sherpa-onnx のモデルだけなら PyTorch 不要
 uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # transformers / funasr のモデルも使うなら
 uv pip install "transformers>=5.16" funasr
-uv pip install supertonic                                    # TTS の Supertonic 3 を使うなら
 python apps/asr_demo.py
-python apps/tts_demo.py
+.venv-tts/Scripts/python apps/tts_demo.py   # TTS は別の環境（apps/README.md）
 ```
 
 ## ベンチマーク
