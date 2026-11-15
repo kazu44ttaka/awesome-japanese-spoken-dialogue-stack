@@ -17,6 +17,11 @@ SHERPA_MODELS = {
     "reazonspeech-k2": "sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01",
     "cohere": "sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01",
     "funasr-nano": "sherpa-onnx-funasr-nano-int8-2025-12-30",
+    # 真のストリーミング（OnlineRecognizer）。チャンクが短いほど途中経過が速く出るが、計算が増える
+    "nemotron-80ms": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-80ms-int8-2026-06-11",
+    "nemotron-320ms": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11",
+    "nemotron-560ms": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11",
+    "nemotron-1120ms": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11",
 }
 
 

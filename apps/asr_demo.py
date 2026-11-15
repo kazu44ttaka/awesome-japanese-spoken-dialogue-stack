@@ -8,7 +8,8 @@
   （区間の終わりでは同じく確定する）。モデルが間隔より遅いと、途中経過はその分まばらになる
 - 確定した行には、音声の長さ・認識にかかった時間・話し終わりから表示までの時間（無音で区切る秒数 + 認識）を出す
 
-真のストリーミング（音声を少しずつ入れて内部状態を引き継ぐ方式）のモデルは未対応。
+- 「真のストリーミング」のモデル（Nemotron 3.5 streaming）は、話し始めから音声を少しずつ入れ、
+  内部状態を引き継ぎながら途中経過を出す。区間の終わりで確定する（方式の選択は使わない）
 """
 
 from __future__ import annotations
@@ -26,12 +27,12 @@ from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from asrkit.backends import BACKENDS, create  # noqa: E402
+from asrkit.backends import BACKENDS, create, create_streaming  # noqa: E402
 from asrkit.models import ensure_silero_vad  # noqa: E402
 
 RATE = 16000
 WINDOW = 512  # Silero VAD の 1 回分（32 ms）
-PREROLL_S = 0.3  # 発話の検出前の音も途中経過に入れる
+PREROLL_S = 0.6  # 発話の検出前の音も入れる（検出は実際の話し始めより 0.2〜0.4 秒遅れる）
 
 
 class Engine:
@@ -40,11 +41,13 @@ class Engine:
     def __init__(self, events: queue.Queue) -> None:
         self.events = events
         self.recognize = None
+        self.streamer = None  # 真のストリーミングのモデル
         self.audio_q: queue.Queue = queue.Queue()
         self.stream = None
         self.worker: threading.Thread | None = None
         self.running = threading.Event()
         self.min_silence = 0.4
+        self._last_partial = ""
 
     # ---------------------------------------------------------------- model
     def load(self, name: str, device: str, threads: int) -> None:
@@ -52,9 +55,14 @@ class Engine:
             self.events.put(("status", f"{BACKENDS[name].label} を読み込み中…（初回はダウンロードに時間がかかります）"))
             try:
                 t0 = time.perf_counter()
-                recognize = create(name, device=device, threads=threads)
-                recognize(np.zeros(RATE // 2, dtype=np.float32))  # ウォームアップ
-                self.recognize = recognize
+                if BACKENDS[name].streaming:
+                    streamer = create_streaming(name, threads=4)
+                    streamer(np.zeros(RATE // 2, dtype=np.float32))  # ウォームアップ
+                    self.streamer, self.recognize = streamer, streamer
+                else:
+                    recognize = create(name, device=device, threads=threads)
+                    recognize(np.zeros(RATE // 2, dtype=np.float32))  # ウォームアップ
+                    self.streamer, self.recognize = None, recognize
                 self.events.put(("loaded", f"読み込み完了（{time.perf_counter() - t0:.1f} 秒）"))
             except Exception as ex:  # noqa: BLE001
                 self.events.put(("error", f"読み込めませんでした: {type(ex).__name__}: {ex}"))
@@ -116,7 +124,12 @@ class Engine:
                         speaking = True
                         speech = [preroll.copy()]
                         last_partial = time.perf_counter()
+                        if self.streamer is not None:
+                            self.streamer.start()
+                            self._stream_feed(preroll)
                     speech.append(window)
+                    if self.streamer is not None:
+                        self._stream_feed(window)
                 else:
                     preroll = np.concatenate([preroll, window])[-int(PREROLL_S * RATE):]
                 # 話し終わり（無音が続いた）を検出したら、その区間を確定する
@@ -124,14 +137,31 @@ class Engine:
                     segment = np.asarray(vad.front.samples, dtype=np.float32)
                     vad.pop()
                     speaking = False
-                    text, ms = self._run(segment)
+                    if self.streamer is not None:
+                        t0 = time.perf_counter()
+                        text = self._clean(self.streamer.finish()) if self.streamer.stream is not None else ""
+                        ms = (time.perf_counter() - t0) * 1000
+                    else:
+                        text, ms = self._run(segment)
                     # 実際に話し終わってから表示までは、無音が続くのを待つ時間 + 認識の時間
                     self.events.put(("final", text, ms, len(segment) / RATE, self.min_silence * 1000 + ms))
-            if partial and speaking and time.perf_counter() - last_partial >= interval_s:
+            if self.streamer is None and partial and speaking and time.perf_counter() - last_partial >= interval_s:
                 text, ms = self._run(np.concatenate(speech))
                 last_partial = time.perf_counter()
                 if speaking:
                     self.events.put(("partial", text, ms))
+
+    def _stream_feed(self, audio: np.ndarray) -> None:
+        t0 = time.perf_counter()
+        text = self._clean(self.streamer.feed(audio))
+        if text and text != self._last_partial:
+            self._last_partial = text
+            self.events.put(("partial", text, (time.perf_counter() - t0) * 1000))
+
+    @staticmethod
+    def _clean(text: str) -> str:
+        # 単語の間に空白を入れるモデルがあるので、日本語の文字の隣の空白は詰める
+        return re.sub(r"(?<=[^\x00-\x7f])\s+|\s+(?=[^\x00-\x7f])", "", text).strip()
 
     def _run(self, audio: np.ndarray) -> tuple[str, float]:
         t0 = time.perf_counter()

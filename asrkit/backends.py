@@ -26,9 +26,12 @@ class BackendInfo:
     label: str
     runtime: str  # "transformers" / "funasr" / "sherpa-onnx"
     gpu: bool  # GPU で動かせるか（sherpa-onnx の配布物は CPU 用）
+    streaming: bool = False  # 真のストリーミング（create_streaming で作る）
 
 
 BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
+    BackendInfo("nemotron-560ms", "Nemotron 3.5 streaming 0.6B・560 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
+    BackendInfo("nemotron-80ms", "Nemotron 3.5 streaming 0.6B・80 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
     BackendInfo("sherpa-sensevoice", "SenseVoiceSmall（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-parakeet-ctc", "Parakeet TDT-CTC 0.6B 日本語（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-reazonspeech-k2", "ReazonSpeech k2-v2（sherpa-onnx・CPU）", "sherpa-onnx", False),
@@ -165,6 +168,59 @@ class Sherpa:
         return re.sub(r"<\|[^|]+\|>", "", stream.result.text)
 
 
+class NemotronStreaming:
+    """Nemotron 3.5 streaming（sherpa-onnx の OnlineRecognizer）。音声を少しずつ入れて内部状態を引き継ぐ。
+
+        s = NemotronStreaming(560)
+        s.start()
+        for chunk in mic: text = s.feed(chunk)   # 途中経過
+        text = s.finish()                        # 確定
+    PyPI の sherpa-onnx 2.0.1 で、MaAI-SDS のカスタムビルドと同じくらいの精度（JSUT 20 発話で確認）。
+    """
+
+    def __init__(self, chunk_ms: int = 560, threads: int = 4, model_dir: Path | None = None) -> None:
+        import sherpa_onnx
+
+        d = Path(model_dir) if model_dir else ensure_sherpa_model(f"nemotron-{chunk_ms}ms")
+        self.chunk_ms = chunk_ms
+        self.rec = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=str(d / "tokens.txt"), encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
+            joiner=str(d / "joiner.int8.onnx"), num_threads=threads, sample_rate=16000, feature_dim=128,
+            decoding_method="greedy_search", dither=0.0)
+        self.stream = None
+
+    def start(self) -> None:
+        self.stream = self.rec.create_stream()
+        self.stream.set_option("language", "ja")
+
+    def feed(self, audio: np.ndarray) -> str:
+        self.stream.accept_waveform(16000, np.ascontiguousarray(audio, dtype=np.float32))
+        while self.rec.is_ready(self.stream):
+            self.rec.decode_stream(self.stream)
+        return str(self.rec.get_result(self.stream)).strip()
+
+    def finish(self) -> str:
+        # 最後のチャンクを押し出すため、チャンク 1 つ分と少しの無音を足してから終える
+        self.stream.accept_waveform(16000, np.zeros(int(16000 * (self.chunk_ms / 1000 + 0.2)), dtype=np.float32))
+        self.stream.input_finished()
+        while self.rec.is_ready(self.stream):
+            self.rec.decode_stream(self.stream)
+        text = str(self.rec.get_result(self.stream)).strip()
+        self.stream = None
+        return text
+
+    def __call__(self, audio: np.ndarray) -> str:
+        """一括で認識する（ほかのモデルと同じ呼び方）。"""
+        self.start()
+        self.feed(audio)
+        return self.finish()
+
+
+def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None) -> NemotronStreaming:
+    chunk = {"nemotron-560ms": 560, "nemotron-80ms": 80}[name]
+    return NemotronStreaming(chunk, threads, model_dir)
+
+
 def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | None = None) -> Callable[[np.ndarray], str]:
     """名前からモデルを読み込み、audio → text の関数を返す。"""
     table = {
@@ -180,4 +236,6 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         return table[name]()
     if name.startswith("sherpa-"):
         return Sherpa(name[len("sherpa-"):], model_dir, threads)
+    if name in BACKENDS and BACKENDS[name].streaming:
+        return create_streaming(name, threads, model_dir)
     raise ValueError(f"unknown backend: {name}")
