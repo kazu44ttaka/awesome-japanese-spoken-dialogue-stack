@@ -18,6 +18,7 @@
 - [TTS（音声合成）](#tts音声合成)
 - [LLM](#llm)
 - [音声対話の周辺（発話区間検出・ターンテイキング・相槌）](#音声対話の周辺発話区間検出ターンテイキング相槌)
+- [動かして試す](#動かして試す)
 - [ベンチマーク](#ベンチマーク)
 - [追加・修正のしかた](#追加修正のしかた)
 
@@ -90,6 +91,19 @@
 | [Silero VAD](https://github.com/snakers4/silero-vad) | Silero | 多言語 | ○ | PyTorch, ONNX | 約 2 MB | MIT | 可 | 定番の発話区間検出 |
 | [MaAI](https://github.com/MaAI-Kyoto/MaAI) | 京都大学 | 専用 | ○ | PyTorch | — | 要確認 | 要確認 | VAP によるターンテイキング・相槌・頷きの予測 |
 | [Smart Turn](https://github.com/pipecat-ai/smart-turn) | Pipecat | 多言語 | — | PyTorch, ONNX | — | 要確認 | 要確認 | 発話の終わり（ターンの終わり）を音声から判定 |
+
+## 動かして試す
+
+- **最小の推論例**：[examples/asr/](examples/asr/) — WAV を 1 つ渡すと書き起こすだけの、モデルごとのスクリプト（単独で動く）
+- **マイクで試すアプリ**：[apps/asr_demo.py](apps/asr_demo.py) — モデルを選び、話した声をその場で認識する。発話区間検出（Silero VAD）で区切って確定し、話している途中の経過も出せる（疑似ストリーミング）。認識にかかった時間と、話し終わりから表示までの時間を表示する
+
+```
+uv venv --python 3.11 .venv
+uv pip install sherpa-onnx sounddevice soundfile numpy      # sherpa-onnx のモデルだけなら PyTorch 不要
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # transformers / funasr のモデルも使うなら
+uv pip install "transformers>=5.16" funasr
+python apps/asr_demo.py
+```
 
 ## ベンチマーク
 

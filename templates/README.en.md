@@ -17,6 +17,7 @@ A curated list of **Japanese speech recognition (ASR), speech synthesis (TTS) an
 - [TTS](#tts)
 - [LLM](#llm)
 - [Spoken dialogue (VAD, turn-taking, backchannels)](#spoken-dialogue-vad-turn-taking-backchannels)
+- [Try it](#try-it)
 - [Benchmarks](#benchmarks)
 - [Contributing](#contributing)
 
@@ -50,6 +51,19 @@ We measure what matters for dialogue — **time to first token and tokens per se
 ## Spoken dialogue (VAD, turn-taking, backchannels)
 
 <!-- table:dialog -->
+
+## Try it
+
+- **Minimal inference examples**: [examples/asr/](examples/asr/) — one standalone script per model that transcribes a WAV file
+- **Microphone demo app**: [apps/asr_demo.py](apps/asr_demo.py) — pick a model and speak; utterances are segmented with Silero VAD and finalized, with optional interim results (pseudo-streaming). Shows recognition time and the delay from the end of speech to the text
+
+```
+uv venv --python 3.11 .venv
+uv pip install sherpa-onnx sounddevice soundfile numpy      # enough for the sherpa-onnx models (no PyTorch)
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # for transformers / funasr models
+uv pip install "transformers>=5.16" funasr
+python apps/asr_demo.py
+```
 
 ## Benchmarks
 

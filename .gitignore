@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 *.wav
 data/eval/
+data/results/
+models/
+data/run_*
+data/chain*.sh
