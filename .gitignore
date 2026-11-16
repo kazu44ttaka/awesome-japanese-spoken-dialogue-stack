@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
-.venv/
+.venv*/
 *.wav
 data/eval/
 data/results/
@@ -8,8 +8,7 @@ models/
 data/run_*
 data/chain*.sh
 apps/tts_engines.toml
-.venv-tts/
 data/*.log
 data/setup_*.sh
 apps/asr_engines.toml
-.venv-qwen-asr/
+data/tts_out/

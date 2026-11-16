@@ -140,7 +140,13 @@ BACKENDS = list(_INFO) + ["granite-nc"]
 def make_backend(name: str, args: argparse.Namespace):
     info = _INFO.get(name)
     if info is not None and info.streaming:
-        return create_streaming(name, threads=args.threads, model_dir=args.model_dir)
+        config = None
+        if name == "nemotron-nemo":  # NeMo のサーバーにも同じ装置を指定する
+            from asrkit.backends import load_config
+
+            config = load_config()
+            config.setdefault("nemotron_nemo", {})["device"] = args.device
+        return create_streaming(name, threads=args.threads, model_dir=args.model_dir, config=config, device=args.device)
     return create(name, device=args.device, threads=args.threads, model_dir=args.model_dir)
 
 
@@ -156,6 +162,8 @@ def main() -> None:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--threads", type=int, default=8, help="sherpa-onnx の CPU スレッド数")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--warmup", type=int, default=1, help="測る前に認識する回数（最初の発話から順に）")
+    ap.add_argument("--batch", type=int, default=1, help="まとめて認識する数（対応するモデルだけ。CER を速く出す用）")
     ap.add_argument("--out", type=Path, default=None, help="結果の JSON（正解文と認識結果を含むので公開しない場所へ）")
     args = ap.parse_args()
 
@@ -173,16 +181,38 @@ def main() -> None:
         rows = rows[: args.limit]
     audios = [read_wav(r["wav"]) for r in rows]
 
+    if args.device == "cpu":
+        # PyTorch の CPU スレッド数も sherpa-onnx と同じ --threads にそろえる（既定はコア数ぶん使う）
+        try:
+            import torch
+
+            torch.set_num_threads(args.threads)
+        except ImportError:
+            pass
     t_load = time.perf_counter()
     recognize = make_backend(args.backend, args)
     load_s = time.perf_counter() - t_load
-    recognize(audios[0])  # ウォームアップ
+    for audio in audios[: max(1, args.warmup)]:  # ウォームアップ
+        recognize(audio)
+
+    # --batch 2 以上は、まとめて認識できるモデル（batch メソッドを持つもの）で CER を速く出すため。
+    # 時間はまとめた時間を発話数で割った値になるので、推論時間の比較には使わない（--batch 1 で測る）
+    hyps: dict[int, tuple[str, float]] = {}
+    if args.batch > 1 and hasattr(recognize, "batch"):
+        order = sorted(range(len(audios)), key=lambda i: len(audios[i]))  # 長さの近いものをまとめて無駄な詰め物を減らす
+        for k in range(0, len(order), args.batch):
+            idx = order[k:k + args.batch]
+            t0 = time.perf_counter()
+            texts = recognize.batch([audios[i] for i in idx])
+            per = (time.perf_counter() - t0) * 1000 / len(idx)
+            for i, text in zip(idx, texts):
+                hyps[i] = (text, per)
 
     results = []
-    for row, audio in zip(rows, audios):
+    for n, (row, audio) in enumerate(zip(rows, audios)):
         t0 = time.perf_counter()
-        hyp = recognize(audio)
-        ms = (time.perf_counter() - t0) * 1000
+        hyp, ms = hyps[n] if n in hyps else (recognize(audio), None)
+        ms = ms if ms is not None else (time.perf_counter() - t0) * 1000
         item = {"utt": row["id"], **score_pair(row["ref"], hyp), "ms": round(ms, 1),
                 "audio_s": round(len(audio) / 16000, 3), "ref": row["ref"], "hyp": hyp}
         results.append(item)
@@ -192,8 +222,10 @@ def main() -> None:
     summary = {
         "backend": args.backend,
         "dataset": args.dataset or str(args.manifest),
-        "device": "cpu" if args.backend.startswith("sherpa-") or args.backend.startswith("nemotron-") and args.backend != "nemotron-nemo" else args.device,
+        "device": getattr(recognize, "device", args.device),  # sherpa-onnx は CPU 版なら cuda を頼んでも CPU になる
+        "threads": args.threads if getattr(recognize, "device", args.device) == "cpu" else None,
         "load_s": round(load_s, 1),
+        "batch": args.batch,
         **summarize(results),
         "mean_ms": round(sum(ms_sorted) / len(ms_sorted), 1),
         "p95_ms": ms_sorted[min(len(ms_sorted) - 1, int(0.95 * len(ms_sorted)))],

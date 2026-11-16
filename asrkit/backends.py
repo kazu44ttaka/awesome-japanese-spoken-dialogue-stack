@@ -10,9 +10,11 @@ sherpa-onnx のモデルは model_dir を省略すると models/ に自動でダ
 
 from __future__ import annotations
 
+import os
 import re
 import socket
 import subprocess
+import sys
 import time
 import tomllib
 from dataclasses import dataclass
@@ -58,6 +60,11 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("qwen3-asr-1.7b", "Qwen3-ASR 1.7B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("moonshine-tiny-ja", "Moonshine tiny-ja（transformers）", "transformers", True),
     BackendInfo("granite", "Granite Speech 5.0 470M TurboCTC（transformers）", "transformers", True),
+    BackendInfo("granite-4.0-1b", "Granite 4.0 1B Speech（transformers）", "transformers", True),
+    BackendInfo("voxtral-realtime", "Voxtral Mini 4B Realtime・480 ms（transformers・GPU 約 9 GB）", "transformers", True),
+    BackendInfo("moonshine-base-ja", "Moonshine base-ja（transformers）", "transformers", True),
+    BackendInfo("haas-ja", "Haas-ja-v1.0（haas-asr・GPU・専用の環境）", "haas-asr", True),
+    BackendInfo("parakeet-ctc-1.1b-ja", "Parakeet CTC 1.1B 日本語（NeMo・専用の環境）", "nemo", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
     BackendInfo("kotoba-whisper-v2.0", "Kotoba-Whisper v2.0（transformers）", "transformers", True),
     BackendInfo("fun-asr-nano", "Fun-ASR-Nano-2512（funasr）", "funasr", True),
@@ -84,6 +91,95 @@ class GraniteCTC:
         with self.torch.inference_mode():
             outputs = self.model.generate(**inputs)
         return self.processor.batch_decode(outputs, skip_special_tokens=True)[0]
+
+
+class Granite4Speech:
+    """IBM Granite 4.0 1B Speech（音声エンコーダ + LLM。chat の形で「書き起こして」と頼む）。"""
+
+    PROMPT = "<|audio|>can you transcribe the speech into a written format?"
+
+    def __init__(self, model_id: str, device: str) -> None:
+        import torch
+        from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+
+        self.torch = torch
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.tokenizer = self.processor.tokenizer
+        dtype = torch.bfloat16 if device.startswith("cuda") else torch.float32
+        self.model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, dtype=dtype).to(device).eval()
+        self.prompt = self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": self.PROMPT}], tokenize=False, add_generation_prompt=True)
+        self.device = device
+
+    def __call__(self, audio: np.ndarray) -> str:
+        wav = self.torch.from_numpy(np.ascontiguousarray(audio, dtype=np.float32)).unsqueeze(0)
+        inputs = self.processor(self.prompt, wav, device=self.device, return_tensors="pt").to(self.device)
+        with self.torch.inference_mode():
+            out = self.model.generate(**inputs, max_new_tokens=200, do_sample=False, num_beams=1)
+        new = out[0, inputs["input_ids"].shape[-1]:]
+        return self.tokenizer.decode(new, skip_special_tokens=True).strip()
+
+
+class VoxtralRealtime:
+    """Mistral Voxtral Mini 4B Realtime を一括で認識する（transformers>=5.2）。
+
+    遅延は既定の 480 ms（6 トークン）。少しずつ入れる使い方は transformers の
+    VoxtralRealtime の説明（is_streaming=True）を参照。
+    """
+
+    def __init__(self, model_id: str, device: str) -> None:
+        import torch
+        from transformers import AutoProcessor, VoxtralRealtimeForConditionalGeneration
+
+        self.torch = torch
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        dtype = torch.bfloat16 if device.startswith("cuda") else torch.float32
+        self.model = VoxtralRealtimeForConditionalGeneration.from_pretrained(model_id, dtype=dtype).to(device).eval()
+        self.device = device
+
+    def __call__(self, audio: np.ndarray) -> str:
+        return self.batch([audio])[0]
+
+    def batch(self, audios: list[np.ndarray]) -> list[str]:
+        """複数の発話をまとめて認識する（1 トークンごとの CPU の手間がまとめて減る。評価を速くする用）。"""
+        inputs = self.processor([np.ascontiguousarray(a, dtype=np.float32) for a in audios], return_tensors="pt")
+        inputs = inputs.to(self.device, dtype=self.model.dtype)
+        with self.torch.inference_mode():
+            out = self.model.generate(**inputs)
+        return [t.strip() for t in self.processor.batch_decode(out, skip_special_tokens=True)]
+
+
+class HaasASR:
+    """Third Intelligence の Haas-ja-v1.0（haas-asr。NeMo 2.7 と flash-linear-attention を使う）。
+
+    公式は Linux 専用だが、Windows でも triton-windows を入れれば動く（別の環境 .venv-haas。apps/README.md）。
+    1 回目の認識は Triton のカーネルを作るので 10 秒ほどかかる。
+    """
+
+    def __init__(self, model_id: str) -> None:
+        import haas_asr
+
+        self.model = haas_asr.load_model(model_id)
+
+    def __call__(self, audio: np.ndarray) -> str:
+        out = self.model.transcribe([np.ascontiguousarray(audio, dtype=np.float32)])
+        return out[0].text.strip() if out else ""
+
+
+class NemoASR:
+    """.nemo の ASR モデルを NeMo で読み込む（parakeet-ctc-1.1b-ja など）。"""
+
+    def __init__(self, repo: str, filename: str, device: str) -> None:
+        import nemo.collections.asr as nemo_asr
+        from huggingface_hub import hf_hub_download
+
+        path = hf_hub_download(repo, filename)
+        self.model = nemo_asr.models.ASRModel.restore_from(path, map_location=device).eval()
+
+    def __call__(self, audio: np.ndarray) -> str:
+        out = self.model.transcribe([np.ascontiguousarray(audio, dtype=np.float32)], batch_size=1, verbose=False)
+        r = out[0] if out else ""
+        return str(getattr(r, "text", r)).replace("⁇", "").lstrip("…").strip()
 
 
 class Moonshine:
@@ -151,37 +247,74 @@ class WhisperHF:
         return str(out.get("text", ""))
 
 
-class Sherpa:
-    """sherpa-onnx のオフライン認識（k2-fsa の配布物。CPU）。"""
+def add_cuda_dll_dirs() -> None:
+    """CUDA 版の ONNX Runtime（sherpa-onnx など）が要る cuDNN 9・cuBLAS の DLL を、PyTorch か nvidia-* の wheel から探す。"""
+    if sys.platform != "win32":
+        return
+    dirs = []
+    try:
+        import torch
 
-    def __init__(self, kind: str, model_dir: Path | None, threads: int) -> None:
+        dirs.append(Path(torch.__file__).parent / "lib")
+    except ImportError:
+        pass
+    try:
+        import nvidia
+
+        for base in nvidia.__path__:
+            dirs += [d for d in Path(base).glob("*/bin") if d.is_dir()]
+    except ImportError:
+        pass
+    for d in dirs:
+        if d.is_dir():
+            os.add_dll_directory(str(d))
+            os.environ["PATH"] = str(d) + os.pathsep + os.environ.get("PATH", "")
+
+
+def sherpa_has_cuda() -> bool:
+    """入っている sherpa-onnx が CUDA 版（版に +cuda が付く）か。CPU 版に cuda を頼むと黙って CPU で動くため確かめる。"""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return "cuda" in version("sherpa-onnx")
+    except PackageNotFoundError:
+        return False
+
+
+class Sherpa:
+    """sherpa-onnx のオフライン認識（k2-fsa の配布物の int8）。CUDA 版の sherpa-onnx なら GPU でも動く。"""
+
+    def __init__(self, kind: str, model_dir: Path | None, threads: int, provider: str = "cpu") -> None:
         import sherpa_onnx
 
+        if provider == "cuda":
+            add_cuda_dll_dirs()
+        self.device = provider
         d = Path(model_dir) if model_dir else ensure_sherpa_model(kind)
         R = sherpa_onnx.OfflineRecognizer
         if kind == "sensevoice":
             self.rec = R.from_sense_voice(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
-                                          num_threads=threads, language="ja", use_itn=True)
+                                          num_threads=threads, provider=provider, language="ja", use_itn=True)
         elif kind == "parakeet-ctc":
             self.rec = R.from_nemo_ctc(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
-                                       num_threads=threads)
+                                       num_threads=threads, provider=provider)
         elif kind == "reazonspeech-k2":
             self.rec = R.from_transducer(
                 encoder=str(d / "encoder-epoch-99-avg-1.int8.onnx"), decoder=str(d / "decoder-epoch-99-avg-1.onnx"),
-                joiner=str(d / "joiner-epoch-99-avg-1.int8.onnx"), tokens=str(d / "tokens.txt"), num_threads=threads)
+                joiner=str(d / "joiner-epoch-99-avg-1.int8.onnx"), tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider)
         elif kind == "cohere":
             self.rec = R.from_cohere_transcribe(encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
-                                                tokens=str(d / "tokens.txt"), num_threads=threads, language="ja",
+                                                tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider, language="ja",
                                                 use_punct=True, use_itn=True)
         elif kind == "qwen3-asr":
             # int8 は CUDA に載せても MatMulInteger が CPU に落ちるので、CPU のまま使う
             self.rec = R.from_qwen3_asr(conv_frontend=str(d / "conv_frontend.onnx"), encoder=str(d / "encoder.int8.onnx"),
                                         decoder=str(d / "decoder.int8.onnx"), tokenizer=str(d / "tokenizer"),
-                                        num_threads=threads, sample_rate=16000, feature_dim=128)
+                                        num_threads=threads, provider=provider, sample_rate=16000, feature_dim=128)
         elif kind == "funasr-nano":
             self.rec = R.from_funasr_nano(encoder_adaptor=str(d / "encoder_adaptor.int8.onnx"), llm=str(d / "llm.int8.onnx"),
                                           embedding=str(d / "embedding.int8.onnx"), tokenizer=str(d / "Qwen3-0.6B"),
-                                          num_threads=threads, language="ja", itn=True, max_new_tokens=128)
+                                          num_threads=threads, provider=provider, language="ja", itn=True, max_new_tokens=128)
         else:
             raise ValueError(kind)
 
@@ -195,11 +328,11 @@ class Sherpa:
 class FasterWhisper:
     """faster-whisper（CTranslate2）。GPU は float16、CPU は int8。"""
 
-    def __init__(self, model_id: str, device: str) -> None:
+    def __init__(self, model_id: str, device: str, threads: int = 0) -> None:
         from faster_whisper import WhisperModel
 
         self.model = WhisperModel(model_id, device="cuda" if device.startswith("cuda") else "cpu",
-                                  compute_type="float16" if device.startswith("cuda") else "int8")
+                                  compute_type="float16" if device.startswith("cuda") else "int8", cpu_threads=threads)
 
     def __call__(self, audio: np.ndarray) -> str:
         segments, _info = self.model.transcribe(np.ascontiguousarray(audio, dtype=np.float32), language="ja",
@@ -305,15 +438,19 @@ class NemotronStreaming:
     PyPI の sherpa-onnx 2.0.1 で、MaAI-SDS のカスタムビルドと同じくらいの精度（JSUT 20 発話で確認）。
     """
 
-    def __init__(self, chunk_ms: int = 560, threads: int = 4, model_dir: Path | None = None) -> None:
+    def __init__(self, chunk_ms: int = 560, threads: int = 4, model_dir: Path | None = None, provider: str = "cpu") -> None:
         import sherpa_onnx
+
+        if provider == "cuda":
+            add_cuda_dll_dirs()
+        self.device = provider
 
         d = Path(model_dir) if model_dir else ensure_sherpa_model(f"nemotron-{chunk_ms}ms")
         self.chunk_ms = chunk_ms
         self.rec = sherpa_onnx.OnlineRecognizer.from_transducer(
             tokens=str(d / "tokens.txt"), encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
             joiner=str(d / "joiner.int8.onnx"), num_threads=threads, sample_rate=16000, feature_dim=128,
-            decoding_method="greedy_search", dither=0.0)
+            decoding_method="greedy_search", dither=0.0, provider=provider)
         self.stream = None
 
     def start(self) -> None:
@@ -343,11 +480,15 @@ class NemotronStreaming:
         return self.finish()
 
 
-def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None, config: dict | None = None):
+def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None, config: dict | None = None,
+                     device: str = "cpu"):
+    """真のストリーミングのモデルを作る。device="cuda" は CUDA 版の sherpa-onnx のときだけ GPU になる。"""
     if name == "nemotron-nemo":
-        return NemoNemotron((config if config is not None else load_config()).get("nemotron_nemo", {}))
+        cfg = dict((config if config is not None else load_config()).get("nemotron_nemo", {}))
+        return NemoNemotron(cfg)
     chunk = {"nemotron-560ms": 560, "nemotron-80ms": 80}[name]
-    return NemotronStreaming(chunk, threads, model_dir)
+    provider = "cuda" if device.startswith("cuda") and sherpa_has_cuda() else "cpu"
+    return NemotronStreaming(chunk, threads, model_dir, provider)
 
 
 def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | None = None) -> Callable[[np.ndarray], str]:
@@ -356,18 +497,24 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "granite": lambda: GraniteCTC("ibm-granite/granite-speech-5.0-470m-turboctc", device),
         "granite-nc": lambda: GraniteCTC("ibm-granite/granite-speech-5.0-470m-turboctc-nc", device),
         "moonshine-tiny-ja": lambda: Moonshine("UsefulSensors/moonshine-tiny-ja", device),
+        "moonshine-base-ja": lambda: Moonshine("UsefulSensors/moonshine-base-ja", device),
+        "granite-4.0-1b": lambda: Granite4Speech("ibm-granite/granite-4.0-1b-speech", device),
+        "voxtral-realtime": lambda: VoxtralRealtime("mistralai/Voxtral-Mini-4B-Realtime-2602", device),
+        "haas-ja": lambda: HaasASR("third-intelligence/Haas-ja-v1.0"),
+        "parakeet-ctc-1.1b-ja": lambda: NemoASR("grider-transwithai/parakeet-ctc-1.1b-ja", "parakeet-ja-gal.nemo", device),
         "fun-asr-mlt-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-MLT-Nano-2512", device),
         "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", device),
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),
         "kotoba-whisper-v2.0": lambda: WhisperHF("kotoba-tech/kotoba-whisper-v2.0", device),
-        "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device),
+        "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device, threads),
         "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
         "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
     }
     if name in table:
         return table[name]()
     if name.startswith("sherpa-"):
-        return Sherpa(name[len("sherpa-"):], model_dir, threads)
+        provider = "cuda" if device.startswith("cuda") and sherpa_has_cuda() else "cpu"
+        return Sherpa(name[len("sherpa-"):], model_dir, threads, provider)
     if name in BACKENDS and BACKENDS[name].streaming:
-        return create_streaming(name, threads, model_dir)
+        return create_streaming(name, threads, model_dir, device=device)
     raise ValueError(f"unknown backend: {name}")

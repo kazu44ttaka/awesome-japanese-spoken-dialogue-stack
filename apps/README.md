@@ -27,6 +27,29 @@ sherpa-onnx のモデル（Nemotron を含む）は、選んで「読み込み�
 | faster-whisper | `uv pip install --python .venv faster-whisper` |
 | Nemotron（NeMo・PyTorch） | NeMo 用の別の環境（`nemo-toolkit[asr]==3.0.0`）。アプリがその環境でサーバーを起動して TCP でつなぐ |
 | Qwen3-ASR（PyTorch） | `qwen-asr` は transformers 4.57 を要求して Granite（5.16 以上）とぶつかるので、別の環境 `.venv-qwen-asr` に入れて、その環境でアプリや測定を動かす |
+| Voxtral Mini 4B Realtime | `"mistral-common[audio]>=1.9"`。GPU のメモリを約 9 GB 使う |
+| Granite 4.0 1B Speech・moonshine-base-ja | なし（transformers で動く） |
+| Haas-ja-v1.0・Parakeet CTC 1.1B 日本語 | 別の環境 `.venv-haas`（下の「Haas」）。NeMo 2.7 を使う |
+
+Haas（公式は Linux 専用だが、Windows 版の Triton を入れると動く。1 回目の認識はカーネルを作るので 10 秒ほどかかる）:
+
+```
+git clone https://github.com/third-intelligence/Haas-ASR models/src/Haas-ASR
+uv venv --python 3.11 .venv-haas
+uv pip install --python .venv-haas torch==2.11.* torchaudio==2.11.* --index-url https://download.pytorch.org/whl/cu128
+uv pip install --python .venv-haas "triton-windows<3.8" fugashi unidic-lite
+# NeMo 2.7.3 の古い固定を、Haas-ASR の pyproject.toml と同じく上書きする（torch も上書きしないと CPU 版に入れ替わる）
+printf 'fsspec[http]>=2026.6.0
+hydra-core>=1.3.8
+packaging>=26.3
+transformers>=5.10.0
+torch==2.11.0
+torchaudio==2.11.0
+' > haas-overrides.txt
+uv pip install --python .venv-haas --override haas-overrides.txt -e models/src/Haas-ASR
+```
+
+Parakeet CTC 1.1B 日本語（有志による日本語版）も同じ環境で動く。配布元の注意どおり `parakeet-ja-gal.nemo` を使う（もう一方は重みが壊れている）。
 
 ## TTS デモ
 
@@ -52,6 +75,10 @@ uv pip install --python .venv-tts sounddevice soundfile numpy
 | Qwen3-TTS（PyTorch） | `qwen-tts`（transformers の版がぶつかるので、さらに別の環境に入れる） | なし |
 | Tsukasa Speech | 下の「Tsukasa」 | [Respair/Tsukasa_Speech](https://huggingface.co/Respair/Tsukasa_Speech) のフォルダーと、使ってよい参照音声 |
 | Kokoro | `kokoro "misaki[ja]"` のあと `python -m unidic download`（辞書 約 500 MB） | なし |
+| ZONOS3-Mini | なし | 下の「ZONOS3-Mini」。C++ のサーバーをビルドする |
+| Kitten TTS 2 | 別の環境 `.venv-kitten` に `kittenml` | なし（初回に約 8 GB 取得）。商用で使うには Stellon Labs への登録が要る |
+| LFM2.5-Audio-1.5B-JP | 別の環境 `.venv-lfm`（Python 3.12）に `liquid-audio` | なし（初回に取得）。声は選べない |
+| MOSS-TTS-Nano | 別の環境 `.venv-nano`（Python 3.12）に clone した MOSS-TTS-Nano | CPU で動く。日本語の声は配布物の 1 つ（Yui） |
 
 Irodori-TTS（学習用の gradio・wandb などは入れず、推論に要るものだけ）:
 
@@ -68,5 +95,32 @@ Tsukasa:
 uv pip install --python .venv-tts munch pydub librosa nltk matplotlib unidic-lite xlstm fugashi cutlet einops einops-exts a_unet ^
   konoha setuptools openai "monotonic_align @ git+https://github.com/resemble-ai/monotonic_align.git"
 ```
+
+別の環境に入れたエンジンは、`apps/tts_engines.toml` の節に `python = ".venv-kitten/Scripts/python.exe"` のようにその環境の Python を書くと、デモアプリ（`.venv-tts`）から子プロセスとして動かせる（`ttskit/worker.py`）。
+
+```
+uv venv --python 3.11 .venv-kitten && uv pip install --python .venv-kitten torch==2.11.* --index-url https://download.pytorch.org/whl/cu128 && uv pip install --python .venv-kitten kittenml soundfile
+uv venv --python 3.12 .venv-lfm && uv pip install --python .venv-lfm torch==2.11.* torchaudio==2.11.* --index-url https://download.pytorch.org/whl/cu128 && uv pip install --python .venv-lfm liquid-audio soundfile
+git clone https://github.com/OpenMOSS/MOSS-TTS-Nano models/src/MOSS-TTS-Nano
+uv venv --python 3.12 .venv-nano && uv pip install --python .venv-nano torch==2.11.* torchaudio==2.11.* --index-url https://download.pytorch.org/whl/cu128 && uv pip install --python .venv-nano -e models/src/MOSS-TTS-Nano soundfile
+```
+
+torch を先に入れても、あとのパッケージが別の版の torch（GPU 非対応）に入れ替えることがある。入れ替わったら `--override` で torch の版を固定して入れ直す。
+MOSS-TTS-Nano は Windows では torchaudio の音声の読み書き（torchcodec が FFmpeg の DLL を要る）が動かないので、`ttskit` の中で soundfile に置き換えている。
+
+ZONOS3-Mini（C++/ggml のサーバー。Rust・CMake・Visual Studio 2022・CUDA 12.8 が要る）:
+
+```
+git clone https://github.com/Zyphra/ZONOS3-Mini models/src/ZONOS3-Mini
+cd models/src/ZONOS3-Mini
+git submodule update --init --depth 1 servers/ggml/ggml third_party/zyphra-textnorm
+cd servers/ggml
+cmake -B build-cuda -G "Visual Studio 17 2022" -A x64 -T cuda="C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8" -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120
+cmake --build build-cuda --config Release -j 8
+hf download Zyphra/ZONOS3-Mini gguf/backbone-ptq.gguf gguf/zac-keep2.gguf gguf/spk-encoder.gguf --local-dir .
+hf download Zyphra/ZONOS3-Mini --include "gguf/voices/*" --local-dir .
+```
+
+`CMAKE_CUDA_ARCHITECTURES` は GPU に合わせる（RTX 50 シリーズは 120）。`zonos3-cli` は Windows で日本語の引数が文字化けするので、アプリはサーバー（`zonos3-server`）を起動して UTF-8 の JSON で頼む。日本語の既定の声は配布されていないので、ほかの言語の既定の声で日本語を読ませる。
 
 確認した組み合わせ（2026-11、Windows 11・RTX 5070 Ti Laptop）では、上のすべてを 1 つの `.venv-tts` に入れて、Qwen3-TTS（PyTorch）以外のエンジンが同時に動いた。

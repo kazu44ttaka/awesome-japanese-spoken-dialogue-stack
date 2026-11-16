@@ -49,6 +49,10 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("qwen3-tts", "Qwen3-TTS 0.6B（PyTorch・GPU）", "pip install qwen-tts（別の環境を推奨）"),
     BackendInfo("tsukasa", "Tsukasa Speech（GPU・非商用）", "Tsukasa のフォルダーと参照音声を tts_engines.toml に書く"),
     BackendInfo("kokoro", "Kokoro 82M（比較用・日本語は崩れやすい）", "pip install kokoro \"misaki[ja]\""),
+    BackendInfo("zonos3", "ZONOS3-Mini（C++ サーバー・GPU）", "zonos3-server をビルドし、GGUF を置く（apps/README.md）"),
+    BackendInfo("kitten", "Kitten TTS 2（別の環境）", "pip install kittenml（別の環境 .venv-kitten）。商用は登録が要る"),
+    BackendInfo("lfm_audio", "LFM2.5-Audio-1.5B-JP（別の環境・GPU）", "pip install liquid-audio（別の環境 .venv-lfm）"),
+    BackendInfo("moss_nano", "MOSS-TTS-Nano 0.1B（別の環境・CPU）", "MOSS-TTS-Nano を clone して入れる（別の環境 .venv-nano）"),
 ]}
 
 
@@ -188,6 +192,8 @@ class Mio:
             port = urllib.parse.urlparse(self.url).port or 18089
             self.server.ensure([str(exe), "-m", str(_path(self.cfg["model"])), "-mv", str(_path(self.cfg["vocoder"])),
                                 "--tts-wavlm-model", str(_path(self.cfg["wavlm"])), "--port", str(port),
+                                # 既定の 768 では長い文（参照 + 生成 800 トークン）が入らず 400 になる
+                                "--ctx-size", str(int(self.cfg.get("ctx_size", 2048))),
                                 "--reference-file-json", json.dumps(refs)], cwd=exe.parent,
                                dll_dirs=self.cfg.get("dll_dirs"))
         return self.server.alive()
@@ -261,8 +267,24 @@ class VoicevoxCore:
         if ort_file is None:
             raise RuntimeError(f"{root} に onnxruntime が見つかりません（ダウンローダーで取った一式を置く）")
         dict_dir = next(iter(sorted(root.glob("dict/open_jtalk_dic_utf_8-*"))), None)
+        mode = str(cfg.get("acceleration", "CPU")).upper()
+        if mode in ("GPU", "AUTO"):
+            # CUDA 版の ONNX Runtime は cuDNN 9・cuBLAS などの DLL を要る。PyTorch（CUDA 版）が入っていればその DLL を使う
+            dll_dirs = [_path(d) for d in cfg.get("dll_dirs", [])]
+            try:
+                import torch
+
+                dll_dirs.append(Path(torch.__file__).parent / "lib")
+            except ImportError:
+                pass
+            for d in dll_dirs:
+                if d.is_dir():
+                    os.add_dll_directory(str(d))
+                    os.environ["PATH"] = str(d) + os.pathsep + os.environ.get("PATH", "")
         ort = Onnxruntime.load_once(filename=str(ort_file))
-        self.synth = Synthesizer(ort, OpenJtalk(str(dict_dir)), acceleration_mode=str(cfg.get("acceleration", "CPU")).upper())
+        # cpu_num_threads を省くと遅い（24 コアの PC で 8 スレッドの約半分の速さだった）
+        self.synth = Synthesizer(ort, OpenJtalk(str(dict_dir)), acceleration_mode=mode,
+                                 cpu_num_threads=int(cfg.get("cpu_threads", 8)))
         self.VoiceModelFile = VoiceModelFile
         self.style_to_vvm: dict[int, Path] = {}
         self.names: list[tuple[str, str]] = []
@@ -436,21 +458,230 @@ class Kokoro:
         return (np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)), 24000
 
 
+class Zonos3:
+    """Zyphra ZONOS3-Mini を C++/ggml のサーバー（zonos3-server）で動かす（POST /v2/generate）。
+
+    コマンドラインの zonos3-cli は Windows で日本語の引数が文字化けするので、UTF-8 の JSON を送れるサーバーを使う。
+    日本語の既定の声は無いので、ほかの言語の既定の声で日本語を読ませる（参照音声で声を変えることもできる）。
+    """
+
+    def __init__(self, cfg: dict) -> None:
+        self.cfg = cfg
+        self.url = str(cfg.get("url", "http://127.0.0.1:1919")).rstrip("/")
+        self.server = _Server(self.url + "/v2/capabilities")
+        self._voices: list[tuple[str, str]] | None = None
+
+    def available(self) -> bool:
+        if not self.server.alive() and self.cfg.get("server_exe"):
+            exe = _path(self.cfg["server_exe"])
+            model = _path(self.cfg.get("model", "models/src/ZONOS3-Mini/servers/ggml/gguf/backbone-ptq.gguf"))
+            port = urllib.parse.urlparse(self.url).port or 1919
+            args = [str(exe), str(model), "--gpu" if self.cfg.get("gpu", True) else "--cpu", "--port", str(port)]
+            if self.cfg.get("voices_dir"):
+                args += ["--tts-default-voices-dir", str(_path(self.cfg["voices_dir"]))]
+            self.server.ensure(args, cwd=model.parent.parent, dll_dirs=self.cfg.get("dll_dirs"))
+        return self.server.alive()
+
+    def voices(self) -> list[tuple[str, str]]:
+        if self._voices is None:
+            speakers = json.loads(_http(self.url + "/v2/speakers"))["speakers"]
+            self._voices = [("", "既定の声")] + [(s["id"], s["label"]) for s in speakers]
+        return self._voices
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        body = {"text": text, "language": "ja", "stream": False, "format": "wav", "seed": int(self.cfg.get("seed", 1))}
+        if voice:
+            body["speaker_embedding_id"] = voice
+        return _read_wav(_http(self.url + "/v2/generate", json.dumps(body, ensure_ascii=False).encode("utf-8")))
+
+    def close(self) -> None:
+        self.server.close()
+
+
+# ---------------------------------------------------------------------------- 別の環境で動かすエンジン
+class Kitten:
+    """KittenML Kitten TTS 2（kittenml）。日本語の声が 4 つある。商用は Stellon Labs への登録が要る。"""
+
+    def __init__(self, cfg: dict) -> None:
+        from kittenml import KittenTTS
+
+        self.model = KittenTTS(str(cfg.get("model", "KittenML/kitten-tts-2")), device=str(cfg.get("device", "cuda")))
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [(v, v) for v in self.model.available_voices if v.startswith("Japanese")]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        # 英語以外は normalize=False（英語向けの数字の読み替えをしない）
+        audio = self.model.generate(text, voice=voice or "JapaneseGrandma", normalize=False)
+        return np.asarray(audio, dtype=np.float32).reshape(-1), int(self.model.sample_rate)
+
+
+class LfmAudio:
+    """Liquid AI LFM2.5-Audio-1.5B-JP の TTS（system に「Perform TTS in japanese.」）。声は選べない。"""
+
+    def __init__(self, cfg: dict) -> None:
+        from liquid_audio import LFM2AudioModel, LFM2AudioProcessor
+
+        repo = str(cfg.get("model", "LiquidAI/LFM2.5-Audio-1.5B-JP"))
+        self.processor = LFM2AudioProcessor.from_pretrained(repo).eval()
+        self.model = LFM2AudioModel.from_pretrained(repo).eval()
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [("", "既定の声（女性）")]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        import torch
+        from liquid_audio import ChatState
+
+        chat = ChatState(self.processor)
+        chat.new_turn("system")
+        chat.add_text("Perform TTS in japanese.")
+        chat.end_turn()
+        chat.new_turn("user")
+        chat.add_text(text)
+        chat.end_turn()
+        chat.new_turn("assistant")
+        frames = [t for t in self.model.generate_sequential(**chat, max_new_tokens=1024, audio_temperature=0.8,
+                                                            audio_top_k=64) if t.numel() > 1]
+        if len(frames) < 2:
+            return np.zeros(0, dtype=np.float32), 24000
+        wav = self.processor.decode(torch.stack(frames[:-1], 1).unsqueeze(0))  # 最後のフレームは終わりの印
+        return wav.cpu()[0].float().numpy().reshape(-1), 24000
+
+
+class MossNano:
+    """OpenMOSS MOSS-TTS-Nano（0.1B・CPU で動く）。日本語の声は配布物の jp_2.wav（Yui）。
+
+    Windows では torchaudio 2.9 以降の load / save が FFmpeg の DLL を要る torchcodec を使うので、soundfile に置き換える。
+    文章の正規化（WeTextProcessing、Windows で入れにくい）は使わない。
+    """
+
+    def __init__(self, cfg: dict) -> None:
+        import soundfile as sf
+        import torch
+        import torchaudio
+
+        def _load(path, *args, **kwargs):
+            x, rate = sf.read(str(path), dtype="float32", always_2d=True)
+            return torch.from_numpy(x.T.copy()), rate
+
+        def _save(path, wav, rate, *args, **kwargs):
+            sf.write(str(path), wav.detach().cpu().float().numpy().T, rate)
+
+        torchaudio.load, torchaudio.save = _load, _save
+        sys.path.insert(0, str(_path(cfg.get("root", "models/src/MOSS-TTS-Nano"))))
+        from moss_tts_nano_runtime import NanoTTSService
+
+        self.service = NanoTTSService(device=str(cfg.get("device", "cpu")),
+                                      output_dir=Path(tempfile.gettempdir()) / "moss-tts-nano")
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        presets = self.service.voice_presets
+        found = [(k, f"{k}（{v.description}）") for k, v in presets.items()
+                 if v.prompt_audio_path.is_file() and "Japanese" in v.description]
+        return found or [("Yui", "Yui")]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        result = self.service.synthesize(text=text, voice=voice or "Yui")
+        return np.asarray(result["waveform_numpy"], dtype=np.float32).reshape(-1), int(result["sample_rate"])
+
+
+class VenvEngine:
+    """エンジンを別の Python 環境の子プロセス（ttskit.worker）で動かす。設定の python にその環境の python を書く。"""
+
+    def __init__(self, name: str, cfg: dict) -> None:
+        self.name, self.cfg = name, cfg
+        self.process: subprocess.Popen | None = None
+        self.lock = threading.Lock()
+
+    def _start(self) -> None:
+        if self.process is not None and self.process.poll() is None:
+            return
+        env = dict(os.environ, TTSKIT_CONFIG=json.dumps(self.cfg, ensure_ascii=False), PYTHONIOENCODING="utf-8",
+                   HF_HUB_DISABLE_PROGRESS_BARS="1")
+        # 親の環境の Python を指す変数を引き継ぐと、版の違う子の Python が親の標準ライブラリを読んで落ちる
+        for key in ("__PYVENV_LAUNCHER__", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
+            env.pop(key, None)
+        if self.cfg.get("hf_cache"):
+            env["HF_HUB_CACHE"] = str(_path(self.cfg["hf_cache"]))
+        self.process = subprocess.Popen([str(_path(self.cfg["python"])), "-m", "ttskit.worker", self.name],
+                                        cwd=str(REPO), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        first = json.loads(self.process.stdout.readline() or '{"error": "子プロセスが終了しました"}')
+        if "error" in first:
+            self.close()
+            raise RuntimeError(first["error"])
+
+    def _call(self, req: dict) -> dict:
+        with self.lock:
+            self._start()
+            self.process.stdin.write(json.dumps(req, ensure_ascii=False) + "\n")
+            self.process.stdin.flush()
+            line = self.process.stdout.readline()
+        res = json.loads(line or '{"error": "子プロセスが終了しました"}')
+        if "error" in res:
+            raise RuntimeError(res["error"])
+        return res
+
+    def available(self) -> bool:
+        self._start()
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [tuple(v) for v in self._call({"cmd": "voices"})["voices"]]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        import base64
+
+        res = self._call({"cmd": "synth", "text": text, "voice": voice, "speed": speed})
+        return np.frombuffer(base64.b64decode(res["audio"]), dtype=np.float32).copy(), int(res["rate"])
+
+    def close(self) -> None:
+        if self.process is not None and self.process.poll() is None:
+            try:
+                self.process.stdin.close()
+                self.process.wait(timeout=5)
+            except Exception:  # noqa: BLE001
+                self.process.kill()
+        self.process = None
+
+
 def _program_files(*parts: str) -> list[Path]:
     local = os.environ.get("LOCALAPPDATA", "")
     return [Path(local, "Programs", *parts)] if local else []
 
 
-def create(name: str, config: dict | None = None):
-    cfg = (config if config is not None else load_config()).get(name, {})
+_LOCAL = {"voicevox_core": "VoicevoxCore", "irodori": "Irodori", "supertonic": "Supertonic", "mio": "Mio",
+          "qwen3_tts_cpp": "Qwen3TTSCpp", "qwen3-tts": "Qwen3TTS", "tsukasa": "Tsukasa", "kokoro": "Kokoro",
+          "zonos3": "Zonos3", "kitten": "Kitten", "lfm_audio": "LfmAudio", "moss_nano": "MossNano"}
+
+
+def create_local(name: str, cfg: dict):
+    """この Python 環境の中でエンジンを作る。"""
     if name == "aivisspeech":
         return VoicevoxCompatible(cfg.get("url", "http://127.0.0.1:10101"),
                                   _program_files("AivisSpeech", "AivisSpeech-Engine", "run.exe"))
     if name == "voicevox":
         return VoicevoxCompatible(cfg.get("url", "http://127.0.0.1:50021"),
                                   _program_files("VOICEVOX", "vv-engine", "run.exe"))
-    table = {"voicevox_core": VoicevoxCore, "irodori": Irodori, "supertonic": Supertonic, "mio": Mio,
-             "qwen3_tts_cpp": Qwen3TTSCpp, "qwen3-tts": Qwen3TTS, "tsukasa": Tsukasa, "kokoro": Kokoro}
-    if name not in table:
+    if name not in _LOCAL:
         raise ValueError(f"unknown backend: {name}")
-    return table[name](cfg)
+    return globals()[_LOCAL[name]](cfg)
+
+
+def create(name: str, config: dict | None = None):
+    """設定（apps/tts_engines.toml の節）に python があれば、その環境の子プロセスで動かす。"""
+    cfg = (config if config is not None else load_config()).get(name, {})
+    if cfg.get("python"):
+        return VenvEngine(name, cfg)
+    return create_local(name, cfg)

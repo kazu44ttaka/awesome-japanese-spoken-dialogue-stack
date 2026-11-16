@@ -13,7 +13,8 @@ url = "http://127.0.0.1:50021"
 # 中に onnxruntime/lib/、dict/open_jtalk_dic_utf_8-1.11/、models/vvms/*.vvm がある
 [voicevox_core]
 runtime_dir = "voicevox_runtime"
-acceleration = "CPU"   # CPU / GPU / AUTO（GPU は CUDA か DirectML 版のランタイムが要る）
+acceleration = "GPU"   # CPU / GPU / AUTO。GPU は CUDA 版の ONNX Runtime と cuDNN 9（PyTorch の CUDA 版が入っていればその DLL を使う）
+cpu_threads = 8        # CPU のとき。省くと遅い
 
 # Irodori-TTS（GPU 推奨）。声は文章で指定する（キャプション）。
 [irodori]
@@ -53,3 +54,26 @@ reference_audio = ""
 # Kokoro（日本語は読みが崩れやすい。比較用）
 [kokoro]
 voices = ["jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"]
+
+# ZONOS3-Mini（Apache-2.0）を C++/ggml のサーバーで動かす。ビルドと重みの取り方は apps/README.md。
+# 日本語の既定の声は無いので、ほかの言語の既定の声（voices_dir）で日本語を読ませる
+[zonos3]
+url = "http://127.0.0.1:1919"
+server_exe = "models/src/ZONOS3-Mini/servers/ggml/build-cuda/Release/zonos3-server.exe"
+model = "models/src/ZONOS3-Mini/servers/ggml/gguf/backbone-ptq.gguf"
+voices_dir = "models/src/ZONOS3-Mini/servers/ggml/gguf/voices"
+dll_dirs = ["models/src/ZONOS3-Mini/servers/ggml/build-cuda/bin/Release", "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/bin"]
+
+# ここから下は、ライブラリの版がぶつかるので別の環境に入れ、その環境の python を書く（子プロセスで動かす）。
+# hf_cache は Hugging Face の重みを置く場所（省略すると既定の場所）
+[kitten]
+python = ".venv-kitten/Scripts/python.exe"
+device = "cuda"
+
+[lfm_audio]
+python = ".venv-lfm/Scripts/python.exe"
+
+[moss_nano]
+python = ".venv-nano/Scripts/python.exe"
+root = "models/src/MOSS-TTS-Nano"
+device = "cpu"
