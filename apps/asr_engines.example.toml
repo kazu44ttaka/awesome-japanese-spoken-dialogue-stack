@@ -8,9 +8,3 @@
 python = ".venv-nemo/Scripts/python.exe"
 chunk_ms = 560      # 80 / 160 / 320 / 560 / 1120
 device = "cuda"
-
-# Google Cloud Speech-to-Text V2 の Chirp 3（料金がかかる）。認証は gcloud auth application-default login
-[chirp3]
-project = ""         # 空なら環境変数 GOOGLE_CLOUD_PROJECT
-location = "asia-northeast1"
-model = "chirp_3"

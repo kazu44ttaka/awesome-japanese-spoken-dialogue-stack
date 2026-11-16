@@ -10,7 +10,6 @@ sherpa-onnx のモデルは model_dir を省略すると models/ に自動でダ
 
 from __future__ import annotations
 
-import os
 import re
 import socket
 import subprocess
@@ -28,7 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def load_config(path: Path | None = None) -> dict:
-    """apps/asr_engines.toml（無ければ example）を読む。NeMo の環境や Chirp 3 のプロジェクトなど。"""
+    """apps/asr_engines.toml（無ければ example）を読む。NeMo の環境など。"""
     for candidate in ([path] if path else [REPO / "apps" / "asr_engines.toml", REPO / "apps" / "asr_engines.example.toml"]):
         if candidate and candidate.is_file():
             return tomllib.loads(candidate.read_text(encoding="utf-8"))
@@ -57,7 +56,6 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("faster-whisper", "Whisper large-v3-turbo（faster-whisper）", "faster-whisper", True),
     BackendInfo("qwen3-asr-0.6b", "Qwen3-ASR 0.6B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("qwen3-asr-1.7b", "Qwen3-ASR 1.7B（qwen-asr・PyTorch）", "qwen-asr", True),
-    BackendInfo("chirp3", "Google Chirp 3（クラウド・Speech-to-Text V2）", "google-cloud-speech", False),
     BackendInfo("moonshine-tiny-ja", "Moonshine tiny-ja（transformers）", "transformers", True),
     BackendInfo("granite", "Granite Speech 5.0 470M TurboCTC（transformers）", "transformers", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
@@ -226,39 +224,6 @@ class Qwen3ASRTorch:
         return str(results[0].text) if results else ""
 
 
-class Chirp3:
-    """Google Cloud Speech-to-Text V2 の Chirp 3（区間ごとに recognize。料金がかかる）。
-
-    認証は Application Default Credentials（gcloud auth application-default login）か
-    GOOGLE_APPLICATION_CREDENTIALS。プロジェクトは apps/asr_engines.toml の [chirp3] か GOOGLE_CLOUD_PROJECT。
-    """
-
-    def __init__(self, cfg: dict) -> None:
-        from google.api_core.client_options import ClientOptions
-        from google.cloud.speech_v2 import SpeechClient
-        from google.cloud.speech_v2.types import cloud_speech
-
-        self.types = cloud_speech
-        project = str(cfg.get("project", "") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")).strip()
-        if not project:
-            raise RuntimeError("Chirp 3 には Google Cloud のプロジェクト ID が要ります（asr_engines.toml か GOOGLE_CLOUD_PROJECT）")
-        location = str(cfg.get("location", "asia-northeast1"))
-        options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com") if location != "global" else None
-        self.client = SpeechClient(client_options=options)
-        self.recognizer = f"projects/{project}/locations/{location}/recognizers/_"
-        self.config = cloud_speech.RecognitionConfig(
-            explicit_decoding_config=cloud_speech.ExplicitDecodingConfig(
-                encoding=cloud_speech.ExplicitDecodingConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=16000, audio_channel_count=1),
-            language_codes=["ja-JP"], model=str(cfg.get("model", "chirp_3")))
-
-    def __call__(self, audio: np.ndarray) -> str:
-        pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
-        response = self.client.recognize(request=self.types.RecognizeRequest(
-            recognizer=self.recognizer, config=self.config, content=pcm))
-        return "".join(r.alternatives[0].transcript for r in response.results if r.alternatives)
-
-
 class NemoNemotron:
     """Nemotron 3.5 streaming を NeMo（PyTorch）で動かす。MaAI-SDS と同じく専用の環境のサーバーに TCP でつなぐ。
 
@@ -398,7 +363,6 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device),
         "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
         "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
-        "chirp3": lambda: Chirp3(load_config().get("chirp3", {})),
     }
     if name in table:
         return table[name]()
