@@ -16,12 +16,14 @@
 | 指標 | 意味 |
 |---|---|
 | CER | 文字誤り率。正解文との編集距離 ÷ 正解の文字数。小さいほどよい。句読点を含めるかどうかで値が変わるので各ページに書く |
+| 読みの CER | 正解文と認識結果をカタカナの読みに変換してから比べた CER。句読点や表記（漢字・かな）の違いを数えない（[asr/scripts/scoring.py](asr/scripts/scoring.py)） |
 | 平均 ms / 最悪 ms | 1 発話あたりの処理時間。音声対話では **最悪値** が体感を決める。ウォームアップを含む 1 回目は除く |
 | RTF | 生成時間 ÷ 音声の長さ。1 より小さければ実時間より速い |
 | ASR 検査（TTS） | 合成した音声を同じ ASR で書き起こし、正解文との CER を見る。欠落・繰り返し・読み間違いの検出用で、声の自然さの評価ではない |
 
 ## ページ
 
+- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 16 構成を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間
 - [asr/2026-11-jsut20.md](asr/2026-11-jsut20.md) — 新しい候補（Moonshine・Granite・Fun-ASR-MLT）と、句読点を除いた CER
 - [tts/2026-08-19.md](tts/2026-08-19.md) — TTS 9 候補の速度・メモリ・ASR 検査
@@ -29,11 +31,12 @@
 
 ## 評価データ
 
-評価用の音声（JSUT など）はライセンス上、このリポジトリには入れません。取得のしかたを各ページに書きます。
+評価用の音声（JSUT・FLEURS・ReazonSpeech・Common Voice）はライセンス上、このリポジトリには入れません。取得のしかたを各ページに書きます。ReazonSpeech は著作権法 30 条の 4 の範囲でだけ使え、ここでは集計した値だけを載せています。
 
 ## 測定スクリプト
 
-- [asr/scripts/eval_asr.py](asr/scripts/eval_asr.py) — ASR の CER（句読点あり・なし）と処理時間
+- [asr/scripts/eval_asr.py](asr/scripts/eval_asr.py) — ASR の CER（句読点あり・なし・読み）と処理時間。`--dataset fleurs-ja` / `reazonspeech-test` / `cv8-ja` で評価データを取得する
+- [asr/scripts/make_table.py](asr/scripts/make_table.py) — 結果を採点し直して Markdown の表にする（`--summary` で評価データを横に並べる）
 - [llm/scripts/bench_llm.py](llm/scripts/bench_llm.py) — LLM の最初の文字までの時間と速さ（OpenAI 互換 API）
 
 2026-08 の測定に使ったスクリプトは [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) の `benchmarks/` にあり、手元のパスを取り除いてからここへ移す予定です。

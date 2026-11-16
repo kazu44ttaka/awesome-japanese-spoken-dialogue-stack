@@ -71,6 +71,7 @@ python apps/asr_demo.py
 
 | Target | What | Results |
 |---|---|---|
+| ASR | Reading-based CER and per-utterance latency on three public test sets (FLEURS, ReazonSpeech, Common Voice; 16 configurations) | [2026-11 (three test sets)](benchmarks/asr/2026-11-3sets.md) (Japanese) |
 | ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
 | TTS | Long-text RTF (synthesis time / audio length), memory, ASR round-trip check | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) (Japanese) |
 | LLM | Time to first token and tokens/s for dialogue replies (LM Studio, 10 models) | [2026-11](benchmarks/llm/2026-11-lmstudio.md) (Japanese) |

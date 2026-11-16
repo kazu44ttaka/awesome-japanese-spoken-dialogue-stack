@@ -89,6 +89,12 @@ HF_SETS = {
 
 def load_hf_set(name: str, subset: int, seed: int = 0) -> list[dict]:
     """parquet を取得し、subset 件を乱数（seed 固定）で選んで WAV に書き出す。"""
+    repo = HF_SETS[name]
+    out_dir = REPO / "data" / "eval" / f"{name}-{subset or 'all'}-seed{seed}"
+    manifest = out_dir / "manifest.json"
+    if manifest.is_file():  # 書き出し済みなら pyarrow などは要らない
+        return load_manifest(manifest, None)
+
     import io
     import random
 
@@ -96,11 +102,6 @@ def load_hf_set(name: str, subset: int, seed: int = 0) -> list[dict]:
     import soundfile as sf
     from huggingface_hub import HfApi, hf_hub_download
 
-    repo = HF_SETS[name]
-    out_dir = REPO / "data" / "eval" / f"{name}-{subset or 'all'}-seed{seed}"
-    manifest = out_dir / "manifest.json"
-    if manifest.is_file():
-        return load_manifest(manifest, None)
     files = sorted(f for f in HfApi().list_repo_files(repo, repo_type="dataset") if f.endswith(".parquet"))
     table_rows = []
     for f in files:

@@ -28,20 +28,20 @@
 
 | モデル | 開発元 | 日本語 | ストリーミング | 動かし方 | 大きさ | ライセンス | 商用 | メモ |
 |---|---|---|---|---|---|---|---|---|
-| [Fun-ASR-Nano-2512](https://github.com/QwenAudio/Fun-ASR) | Alibaba (FunAudioLLM) | 多言語 | — | PyTorch, sherpa-onnx | 約 0.8B（音声エンコーダ + Qwen3-0.6B デコーダ） | 要確認（モデル固有） | 要確認 | 測った中で最も高精度（CER 0.08 台）。LLM デコーダのため遅延がぶれる。生成上限を 128 トークンに絞ると最悪遅延が収まる （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [SenseVoiceSmall](https://github.com/QwenAudio/SenseVoice) | Alibaba (FunAudioLLM) | 多言語 | △（区切って再推論） | FunASR, ONNX, sherpa-onnx, GGUF | 約 234M | 要確認（FunASR モデルライセンス） | 要確認 | 精度と速度の両立（CPU で 1 発話 約 90 ms）。sherpa-onnx の int8-2024-07-17 版を使うこと（2025-09-09 版は広東語向け） （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [Parakeet TDT 0.6B Japanese](https://github.com/CrispStrobe/CrispASR/blob/main/hf_readmes/parakeet-tdt-0.6b-ja-GGUF.md) | NVIDIA（日本語版の配布は CrispASR） | 専用 | — | CrispASR (GGUF), sherpa-onnx | 0.6B（Q8 約 660 MB） | CC-BY-4.0 | 可 | GGUF（Q8・CPU）で CER 0.077。sherpa-onnx の CTC 版は CER 0.12 と控えめ （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [Cohere ASR Japanese](https://huggingface.co/CKHO/cohere-asr-ja-GGUF) | Cohere | 多言語 | — | CrispASR (GGUF), sherpa-onnx | Q4_K 約 1.5 GB 〜 Q8_0 約 2.4 GB | Apache-2.0 | 可 | 14 言語。日本語の CER 0.086（Q4_K・CPU） （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [Qwen3-ASR (1.7B / 0.6B)](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Alibaba (Qwen) | 多言語 | — | PyTorch, ONNX, GGUF | 1.7B / 0.6B | Apache-2.0 | 可 | 52 言語と言語識別。0.6B ONNX は CER 0.11。1.7B は手元の ONNX 変換で出力が崩れたため未評価 （[測定](benchmarks/asr/2026-08-jsut20.md)） |
+| [Fun-ASR-Nano-2512](https://github.com/QwenAudio/Fun-ASR) | Alibaba (FunAudioLLM) | 多言語 | — | PyTorch, sherpa-onnx | 約 0.8B（音声エンコーダ + Qwen3-0.6B デコーダ） | 要確認（モデル固有） | 要確認 | 読みの CER は FLEURS 0.059・ReazonSpeech 0.132・Common Voice 0.034（funasr・CUDA）。sherpa-onnx 版は放送の話し言葉で崩れやすい（0.217） （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [SenseVoiceSmall](https://github.com/QwenAudio/SenseVoice) | Alibaba (FunAudioLLM) | 多言語 | △（区切って再推論） | FunASR, ONNX, sherpa-onnx, GGUF | 約 234M | 要確認（FunASR モデルライセンス） | 要確認 | CPU で 1 発話 約 65 ms と速い。読み上げでは読みの CER 0.05 前後だが、放送の話し言葉（ReazonSpeech）では 0.191 と崩れる。sherpa-onnx の int8-2024-07-17 版を使うこと（2025-09-09 版は広東語向け） （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Parakeet TDT 0.6B Japanese](https://github.com/CrispStrobe/CrispASR/blob/main/hf_readmes/parakeet-tdt-0.6b-ja-GGUF.md) | NVIDIA（日本語版の配布は CrispASR） | 専用 | — | CrispASR (GGUF), sherpa-onnx | 0.6B（Q8 約 660 MB） | CC-BY-4.0 | 可 | sherpa-onnx の CTC 版（CPU・1 発話 約 130 ms）で読みの CER 0.036〜0.088。GGUF（CrispASR・Q8）版は JSUT で CER 0.077 （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Cohere ASR Japanese](https://huggingface.co/CKHO/cohere-asr-ja-GGUF) | Cohere | 多言語 | — | CrispASR (GGUF), sherpa-onnx | Q4_K 約 1.5 GB 〜 Q8_0 約 2.4 GB | Apache-2.0 | 可 | 3 つの評価データを通して最も安定（読みの CER 0.017〜0.049）。CPU で 1 発話 0.5〜1.5 秒。14 言語 （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Qwen3-ASR (1.7B / 0.6B)](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Alibaba (Qwen) | 多言語 | — | PyTorch, ONNX, GGUF | 1.7B / 0.6B | Apache-2.0 | 可 | 52 言語と言語識別。0.6B（PyTorch・CUDA）は読み上げで読みの CER 0.05〜0.06 だが、放送の話し言葉では 0.228 と崩れる。ONNX 版はさらに誤りが多い。1.7B は未評価 （[測定](benchmarks/asr/2026-11-3sets.md)） |
 | [ReazonSpeech NeMo v2](https://huggingface.co/reazon-research/reazonspeech-nemo-v2) | Reazon Holdings | 専用 | — | NVIDIA NeMo | 619M | Apache-2.0 | 可 | CUDA で CER 0.115・約 300 ms （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [ReazonSpeech k2-v2](https://research.reazon.jp/projects/ReazonSpeech/index.html) | Reazon Holdings | 専用 | — | sherpa-onnx | 159M | Apache-2.0 | 可 | とても軽い日本語専用モデル。CPU 常駐向け （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [Nemotron Speech ASR 0.6B (streaming)](https://huggingface.co/nvidia) | NVIDIA | 多言語 | ○ | NeMo, sherpa-onnx（要カスタムビルド） | 0.6B | 要確認（NVIDIA Open Model License） | 要確認 | 測った中で唯一の真のストリーミング（80 / 320 / 560 / 1120 ms チャンク）。精度は CER 0.14〜0.19 （[測定](benchmarks/asr/2026-08-jsut20.md)） |
+| [ReazonSpeech k2-v2](https://research.reazon.jp/projects/ReazonSpeech/index.html) | Reazon Holdings | 専用 | — | sherpa-onnx | 159M | Apache-2.0 | 可 | CPU で 1 発話 約 60 ms と速く、精度も上位（読みの CER 0.024〜0.068）。ReazonSpeech コーパスで学習しているので放送の話し言葉に強い （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Nemotron Speech ASR 0.6B (streaming)](https://huggingface.co/nvidia) | NVIDIA | 多言語 | ○ | NeMo, sherpa-onnx（要カスタムビルド） | 0.6B | 要確認（NVIDIA Open Model License） | 要確認 | 測った中で唯一の真のストリーミング（80 / 560 ms チャンク）。精度は低め（読みの CER 0.10〜0.24）で、短い発話を何も出さずに落とすことがある。PyPI の sherpa-onnx 2.0.1 で動く （[測定](benchmarks/asr/2026-11-3sets.md)） |
 | [Kotoba-Whisper v2.2](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) | Kotoba Technologies | 専用 | — | Transformers, faster-whisper, whisper.cpp | 約 756M | Apache-2.0 | 可 | 日本語特化の蒸留 Whisper。CER 0.133 （[測定](benchmarks/asr/2026-08-jsut20.md)） |
-| [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | OpenAI | 多言語 | — | faster-whisper, whisper.cpp, Transformers | 809M | MIT | 可 | 比較の基準に。CER 0.119。CPU では遅い（1 発話 約 9 秒） （[測定](benchmarks/asr/2026-08-jsut20.md)） |
+| [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | OpenAI | 多言語 | — | faster-whisper, whisper.cpp, Transformers | 809M | MIT | 可 | 比較の基準に。faster-whisper（CUDA FP16）で読みの CER 0.028〜0.104・1 発話 約 200 ms。transformers 版より同じ言葉を繰り返す暴走が少ない。CPU では遅い （[測定](benchmarks/asr/2026-11-3sets.md)） |
 | [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | Microsoft | 多言語 | — | PyTorch | 約 8B | 要確認 | 要確認 | 60 分級の長い音声を話者・時刻つきで書き起こす。未測定 |
-| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | Moonshine AI (Useful Sensors) | 専用 | — | Transformers, ONNX | 27M | Moonshine Community License（英語以外のモデルは非商用） | 不可 | 27M と極小なのに句読点ありで CER 0.078（句読点なし 0.052）。CPU で 1 発話 145 ms （[測定](benchmarks/asr/2026-11-jsut20.md)） |
-| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | IBM | 多言語 | — | Transformers (>=5.16), transcribe.cpp (GGUF) | 470M（エンコーダのみ・CTC） | Apache-2.0 | 可 | 7 言語（2026-10 に日本語対応）。GPU で 1 発話 18 ms と非常に速い。読点をほぼ出さない（句読点なし CER 0.065）。-nc 版は日本語非対応だった （[測定](benchmarks/asr/2026-11-jsut20.md)） |
-| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Alibaba (FunAudioLLM) | 多言語 | — | funasr (PyTorch) | 約 0.8B | Apache-2.0 | 可 | Fun-ASR-Nano の 31 言語版。CER 0.090（句読点なし 0.069）で日本語専用版よりわずかに低い （[測定](benchmarks/asr/2026-11-jsut20.md)） |
+| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | Moonshine AI (Useful Sensors) | 専用 | — | Transformers, ONNX | 27M | Moonshine Community License（英語以外のモデルは非商用） | 不可 | 27M と極小。CPU で 1 発話 約 150 ms、読みの CER 0.050〜0.086 （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | IBM | 多言語 | — | Transformers (>=5.16), transcribe.cpp (GGUF) | 470M（エンコーダのみ・CTC） | Apache-2.0 | 可 | 7 言語（2026-10 に日本語対応）。GPU で 1 発話 16 ms と非常に速く、読みの CER 0.014〜0.073。読点をほぼ出さない。-nc 版は日本語非対応だった （[測定](benchmarks/asr/2026-11-3sets.md)） |
+| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Alibaba (FunAudioLLM) | 多言語 | — | funasr (PyTorch) | 約 0.8B | Apache-2.0 | 可 | 3 つの評価データで上位（読みの CER 0.014〜0.058）。FLEURS だけ飛び抜けてよいのは学習データとの重なりの可能性あり。CUDA で 1 発話 0.4〜1 秒 （[測定](benchmarks/asr/2026-11-3sets.md)） |
 
 ### 未評価の候補
 
@@ -111,6 +111,7 @@ python apps/asr_demo.py
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
+| ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER と 1 発話あたりの処理時間（16 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
 | ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |
 | TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) |
 | LLM | 音声対話での最初の文字までの時間（TTFT）と文字の出る速さ（LM Studio・10 モデル） | [2026-11](benchmarks/llm/2026-11-lmstudio.md) |
