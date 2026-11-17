@@ -45,6 +45,12 @@ server_exe = "audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe"
 model = "audio.cpp/models/Qwen3-TTS-12Hz-1.7B-CustomVoice-GGUF/qwen3-tts-12hz-1.7b-customvoice-q8_0.gguf"
 voices = ["Ono_Anna", "Vivian", "Serena", "Ryan"]   # 日本語は Ono_Anna
 
+# Supertonic 3 を audio.cpp のサーバー（GGUF・CUDA）で動かす（MaAI-SDS と同じ動かし方。Python の supertonic より速い）
+[supertonic_cpp]
+server_exe = "audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe"
+model = "audio.cpp/models/Supertonic-3-GGUF/supertonic-3-orig.gguf"
+steps = 8
+
 # Tsukasa Speech（非商用 CC-BY-NC-4.0）。Hugging Face の Respair/Tsukasa_Speech を置いたフォルダーと、
 # 声をまねる参照音声（自分の声など、使ってよい WAV）
 [tsukasa]

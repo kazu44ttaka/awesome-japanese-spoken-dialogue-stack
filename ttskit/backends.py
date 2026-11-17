@@ -44,6 +44,8 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("voicevox_core", "VOICEVOX Core（アプリの中で動かす）", "voicevox_core の wheel と、ダウンローダーで取った一式（runtime_dir）"),
     BackendInfo("irodori", "Irodori-TTS v4.1 Small（GPU）", "irodori-tts（README の手順）。声は文章で指定する"),
     BackendInfo("supertonic", "Supertonic 3（ONNX・CPU）", "pip install supertonic"),
+    BackendInfo("supertonic_cpp", "Supertonic 3（audio.cpp のサーバー・GPU）",
+                "audiocpp_server と Supertonic 3 の GGUF を tts_engines.toml に書く（MaAI-SDS と同じ動かし方）"),
     BackendInfo("mio", "mio-tts-cpp（サーバーに HTTP で接続・CPU/GPU）", "mio-tts-server をビルドしておく（または起動済み）"),
     BackendInfo("qwen3_tts_cpp", "Qwen3-TTS 1.7B（audio.cpp のサーバー・GPU）", "audiocpp_server をビルドし、GGUF を置く"),
     BackendInfo("qwen3-tts", "Qwen3-TTS 0.6B（PyTorch・GPU）", "pip install qwen-tts（別の環境を推奨）"),
@@ -341,6 +343,8 @@ class Irodori:
             torch.set_float32_matmul_precision("high")
         self.SamplingRequest = SamplingRequest
         self.steps = int(cfg.get("steps", 40))  # 公式の既定（MeanFlow でないチェックポイント）
+        # 参照音声（声のクローン）。省くとキャプションだけで声を決める（MaAI-SDS は参照音声と 16 ステップ）
+        self.reference_audio = str(cfg.get("reference_audio", "") or "")
         self.schedule = str(cfg.get("t_schedule_mode", "linear"))  # 公式の高速化の例は steps=6 と sway
         self.captions = list(cfg.get("captions", ["明るく自然な日本語の声"]))
         self.runtime = InferenceRuntime.from_key(RuntimeKey(
@@ -357,11 +361,51 @@ class Irodori:
         return [(c, c) for c in self.captions]
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        ref = {"ref_wav": str(_path(self.reference_audio))} if self.reference_audio else {"no_ref": True}
         req = self.SamplingRequest(text=text, caption=voice, num_steps=self.steps, cfg_scale_text=3.0,
-                                   cfg_scale_caption=3.0, cfg_scale_speaker=5.0, seed=42, no_ref=True,
-                                   t_schedule_mode=self.schedule)
+                                   cfg_scale_caption=3.0, cfg_scale_speaker=5.0, seed=42,
+                                   t_schedule_mode=self.schedule, **ref)
         result = self.runtime.synthesize(req, log_fn=None)
         return result.audio.detach().float().cpu().numpy().reshape(-1), int(result.sample_rate)
+
+
+class SupertonicCpp:
+    """Supertonic 3 を audio.cpp の常駐サーバー（GGUF・CUDA）で動かす（MaAI-SDS の SupertonicEngine と同じ）。"""
+
+    def __init__(self, cfg: dict) -> None:
+        self.port = int(cfg.get("port", 18082))
+        self.url = f"http://127.0.0.1:{self.port}"
+        self.model_id = "supertonic-3"
+        self.steps = max(1, min(int(cfg.get("steps", 8)), 8))
+        self.server_exe = _path(cfg.get("server_exe", "audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe"))
+        self.model_path = _path(cfg.get("model", "audio.cpp/models/Supertonic-3-GGUF/supertonic-3-orig.gguf"))
+        self.server = _Server(self.url + "/health")
+        if not self.server.alive():
+            config = {"host": "127.0.0.1", "port": self.port, "backend": "cuda", "device": 0, "threads": 8,
+                      "lazy_load": False,
+                      "models": [{"id": self.model_id, "family": "supertonic", "path": str(self.model_path), "task": "tts",
+                                  "mode": "offline",
+                                  "default_request_options": {"voice_id": "F1", "num_inference_steps": self.steps,
+                                                              "language": "ja", "speaking_rate": 1.0}}]}
+            config_file = Path(tempfile.gettempdir()) / f"ttskit-supertonic-{self.port}.json"
+            config_file.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+            self.server.ensure([str(self.server_exe), "--config", str(config_file)], cwd=self.server_exe.parent.parent.parent.parent)
+
+    def available(self) -> bool:
+        return self.server.alive()
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [(v, f"{'女性' if v.startswith('F') else '男性'} {v}") for v in
+                ["F1", "F2", "F3", "F4", "F5", "M1", "M2", "M3", "M4", "M5"]]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        voice = voice or "F1"
+        body = {"model": self.model_id, "input": text, "voice": voice, "response_format": "wav",
+                "options": {"voice_id": voice, "num_inference_steps": self.steps, "language": "ja", "speaking_rate": float(speed)}}
+        return _read_wav(_http(self.url + "/v1/audio/speech", json.dumps(body, ensure_ascii=False).encode("utf-8")))
+
+    def close(self) -> None:
+        self.server.close()
 
 
 class Supertonic:
@@ -680,6 +724,7 @@ def _program_files(*parts: str) -> list[Path]:
 
 
 _LOCAL = {"voicevox_core": "VoicevoxCore", "irodori": "Irodori", "supertonic": "Supertonic", "mio": "Mio",
+          "supertonic_cpp": "SupertonicCpp",
           "qwen3_tts_cpp": "Qwen3TTSCpp", "qwen3-tts": "Qwen3TTS", "tsukasa": "Tsukasa", "kokoro": "Kokoro",
           "zonos3": "Zonos3", "kitten": "Kitten", "lfm_audio": "LfmAudio", "moss_nano": "MossNano"}
 

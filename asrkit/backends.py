@@ -56,6 +56,8 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("sherpa-funasr-nano", "Fun-ASR-Nano（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("sherpa-qwen3-asr", "Qwen3-ASR 0.6B（sherpa-onnx・CPU）", "sherpa-onnx", False),
     BackendInfo("faster-whisper", "Whisper large-v3-turbo（faster-whisper）", "faster-whisper", True),
+    BackendInfo("faster-whisper-sds", "Kotoba-Whisper v2.2（faster-whisper・MaAI-SDS の設定）", "faster-whisper", True),
+    BackendInfo("sherpa-reazonspeech-k2-sds", "ReazonSpeech k2-v2（sherpa-onnx・CPU・MaAI-SDS の設定）", "sherpa-onnx", False),
     BackendInfo("qwen3-asr-0.6b", "Qwen3-ASR 0.6B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("qwen3-asr-1.7b", "Qwen3-ASR 1.7B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("moonshine-tiny-ja", "Moonshine tiny-ja（transformers）", "transformers", True),
@@ -360,6 +362,7 @@ class Sherpa:
         if provider == "cuda":
             add_cuda_dll_dirs()
         self.device = provider
+        self.kind = kind
         fp32 = provider == "cuda" and kind in ("sensevoice", "reazonspeech-k2", "funasr-nano")
         self.precision = "fp32" if fp32 else "int8"
         q = "" if fp32 else ".int8"
@@ -385,7 +388,7 @@ class Sherpa:
                                                 tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider, language="ja",
                                                 use_punct=True, use_itn=True)
         elif kind == "qwen3-asr":
-            # fp32 の配布が無い。言語を指定する引数も無い（日本語以外で出ることがある）
+            # fp32 の配布が無い。言語は認識のたびに stream.set_option("language", "Japanese") で指定する（__call__）
             self.rec = R.from_qwen3_asr(conv_frontend=str(d / "conv_frontend.onnx"), encoder=str(d / "encoder.int8.onnx"),
                                         decoder=str(d / "decoder.int8.onnx"), tokenizer=str(d / "tokenizer"),
                                         num_threads=threads, provider=provider, sample_rate=16000, feature_dim=128)
@@ -398,24 +401,70 @@ class Sherpa:
 
     def __call__(self, audio: np.ndarray) -> str:
         stream = self.rec.create_stream()
+        if self.kind == "qwen3-asr":
+            # 言語を日本語に固定する（MaAI-SDS の engines_local.py と同じ）。指定しないと自動判定で
+            # 韓国語・英語・中国語に流れることがある
+            stream.set_option("language", "Japanese")
         stream.accept_waveform(16000, np.ascontiguousarray(audio, dtype=np.float32))
         self.rec.decode_stream(stream)
-        return re.sub(r"<\|[^|]+\|>", "", stream.result.text)
+        text = re.sub(r"<\|[^|]+\|>", "", stream.result.text)
+        return clean_qwen_text(text) if self.kind == "qwen3-asr" else text
+
+
+def clean_qwen_text(text: str) -> str:
+    """Qwen3-ASR の "language Japanese<asr_text>本文" から本文だけを取り出す（MaAI-SDS の _clean_qwen_text と同じ）。"""
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    m = re.search(r"<\s*asr_text\s*>", cleaned, flags=re.IGNORECASE)
+    if m:
+        cleaned = cleaned[m.end():]
+    cleaned = re.sub(r"</?\s*asr_text\s*>", "", cleaned, flags=re.IGNORECASE)
+    if m is None:
+        cleaned = re.sub(r"^\s*language\s+[A-Za-z\-]+\s*[:：]?\s*", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
 
 
 class FasterWhisper:
-    """faster-whisper（CTranslate2）。GPU は float16、CPU は int8。"""
+    """faster-whisper（CTranslate2）。既定は GPU で float16・CPU で int8・beam 1。
 
-    def __init__(self, model_id: str, device: str, threads: int = 0) -> None:
+    MaAI-SDS の設定（faster-whisper-sds）は、Kotoba-Whisper v2.2 を int8_float16・beam 5 で動かし、
+    先頭に 0.5 秒の無音を足す（MaAI-SDS の engines_local.py と同じ）。
+    """
+
+    def __init__(self, model_id: str, device: str, threads: int = 0, beam_size: int = 1,
+                 compute_type: str | None = None, lead_silence_sec: float = 0.0) -> None:
         from faster_whisper import WhisperModel
 
-        self.model = WhisperModel(model_id, device="cuda" if device.startswith("cuda") else "cpu",
-                                  compute_type="float16" if device.startswith("cuda") else "int8", cpu_threads=threads)
+        cuda = device.startswith("cuda")
+        self.model = WhisperModel(model_id, device="cuda" if cuda else "cpu",
+                                  compute_type=compute_type or ("float16" if cuda else "int8"), cpu_threads=threads)
+        self.beam_size = beam_size
+        self.lead = np.zeros(int(16000 * lead_silence_sec), dtype=np.float32)
 
     def __call__(self, audio: np.ndarray) -> str:
+        audio = np.concatenate([self.lead, np.asarray(audio, dtype=np.float32)]) if len(self.lead) else audio
         segments, _info = self.model.transcribe(np.ascontiguousarray(audio, dtype=np.float32), language="ja",
-                                                beam_size=1, vad_filter=False, condition_on_previous_text=False)
+                                                beam_size=self.beam_size, vad_filter=False, condition_on_previous_text=False)
         return "".join(s.text for s in segments)
+
+
+class LeadSilence:
+    """認識の前に先頭へ無音を足す（MaAI-SDS は zipformer に 0.5 秒足して先頭を安定させている）。"""
+
+    def __init__(self, inner, sec: float = 0.5) -> None:
+        self.inner = inner
+        self.lead = np.zeros(int(16000 * sec), dtype=np.float32)
+        self.device = getattr(inner, "device", "cpu")
+        self.precision = getattr(inner, "precision", None)
+
+    def __call__(self, audio: np.ndarray) -> str:
+        return self.inner(np.concatenate([self.lead, np.asarray(audio, dtype=np.float32)]))
+
+    def close(self) -> None:
+        close = getattr(self.inner, "close", None)
+        if callable(close):
+            close()
 
 
 class Qwen3ASRTorch:
@@ -585,6 +634,11 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),
         "kotoba-whisper-v2.0": lambda: WhisperHF("kotoba-tech/kotoba-whisper-v2.0", device),
         "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device, threads),
+        "faster-whisper-sds": lambda: FasterWhisper("RoachLin/kotoba-whisper-v2.2-faster", device, threads, beam_size=5,
+                                                    compute_type="int8_float16" if device.startswith("cuda") else "int8",
+                                                    lead_silence_sec=0.5),
+        # MaAI-SDS と同じく CPU の int8 エンコーダ・fp32 デコーダで、先頭に 0.5 秒の無音を足す
+        "sherpa-reazonspeech-k2-sds": lambda: LeadSilence(Sherpa("reazonspeech-k2", model_dir, threads, "cpu"), 0.5),
         "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
         "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
     }
