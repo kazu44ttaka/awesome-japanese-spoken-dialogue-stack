@@ -12,3 +12,7 @@ data/*.log
 data/setup_*.sh
 apps/asr_engines.toml
 data/tts_out/
+!data/voices/*.wav
+data/smoke_*
+data/bench_tts_list.txt
+data/.*.lock/

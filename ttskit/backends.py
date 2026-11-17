@@ -753,7 +753,16 @@ def create_local(name: str, cfg: dict):
 
 
 def create(name: str, config: dict | None = None):
-    """設定（apps/tts_engines.toml の節）に python があれば、その環境の子プロセスで動かす。"""
+    """設定（apps/tts_engines.toml の節）に python があれば、その環境の子プロセスで動かす。
+
+    crispasr-<名前>・speechcpp-<名前>・audiocpp-<名前> は ggml 系の実行系のサーバー（runtimes/catalog.py の TTS）。
+    """
+    runtime, _, key = name.partition("-")
+    if runtime in ("crispasr", "speechcpp", "audiocpp"):
+        from runtimes.servers import create_tts
+
+        cfg = (config if config is not None else load_config()).get(name, {})
+        return create_tts(runtime, key, device=str(cfg.get("device", "cuda")), threads=int(cfg.get("threads", 8)))
     cfg = (config if config is not None else load_config()).get(name, {})
     if cfg.get("python"):
         return VenvEngine(name, cfg)
