@@ -151,6 +151,66 @@ class VoxtralRealtime:
         return [t.strip() for t in self.processor.batch_decode(out, skip_special_tokens=True)]
 
 
+class VenvASR:
+    """モデルを別の Python 環境の子プロセス（asrkit.worker）で動かす。
+
+    Haas-ja と Parakeet CTC 1.1B ja は NeMo 2.7 を使う専用の環境（.venv-haas）にしか入らないので、
+    いまの環境に haas_asr / nemo が無いときはこれで動かす（デモアプリから選べるように）。
+    """
+
+    def __init__(self, name: str, python: Path, device: str = "cuda") -> None:
+        import json
+
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", HF_HUB_DISABLE_PROGRESS_BARS="1")
+        # 親の環境の Python を指す変数を引き継ぐと、版の違う子の Python が親の標準ライブラリを読んで落ちる
+        for key in ("__PYVENV_LAUNCHER__", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
+            env.pop(key, None)
+        env.setdefault("HF_HUB_CACHE", str(REPO / "models" / "hf"))
+        self.device = device
+        self.process = subprocess.Popen([str(python), "-m", "asrkit.worker", name, device], cwd=str(REPO), env=env,
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                        text=True, encoding="utf-8",
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        first = json.loads(self.process.stdout.readline() or '{"error": "子プロセスが終了しました"}')
+        if "error" in first:
+            self.close()
+            raise RuntimeError(first["error"])
+
+    def __call__(self, audio: np.ndarray) -> str:
+        import base64
+        import json
+
+        pcm = base64.b64encode(np.ascontiguousarray(audio, dtype=np.float32).tobytes()).decode("ascii")
+        self.process.stdin.write(json.dumps({"audio": pcm}) + "\n")
+        self.process.stdin.flush()
+        res = json.loads(self.process.stdout.readline() or '{"error": "子プロセスが終了しました"}')
+        if "error" in res:
+            raise RuntimeError(res["error"])
+        return str(res["text"])
+
+    def close(self) -> None:
+        if self.process is not None and self.process.poll() is None:
+            try:
+                self.process.stdin.close()
+                self.process.wait(timeout=5)
+            except Exception:  # noqa: BLE001
+                self.process.kill()
+        self.process = None
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# 専用の環境で動かすモデル → (いまの環境に要るモジュール, 専用の環境の python)
+_VENV_MODELS = {
+    "haas-ja": ("haas_asr", REPO / ".venv-haas" / "Scripts" / "python.exe"),
+    "parakeet-ctc-1.1b-ja": ("nemo", REPO / ".venv-haas" / "Scripts" / "python.exe"),
+}
+
+
 class HaasASR:
     """Third Intelligence の Haas-ja-v1.0（haas-asr。NeMo 2.7 と flash-linear-attention を使う）。
 
@@ -528,6 +588,12 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
         "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
     }
+    if name in _VENV_MODELS:
+        import importlib.util
+
+        module, python = _VENV_MODELS[name]
+        if importlib.util.find_spec(module) is None and python.is_file():
+            return VenvASR(name, python, device)
     if name in table:
         return table[name]()
     if name.startswith("sherpa-"):

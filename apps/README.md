@@ -29,7 +29,7 @@ sherpa-onnx のモデル（Nemotron を含む）は、選んで「読み込み�
 | Qwen3-ASR（PyTorch） | `qwen-asr` は transformers 4.57 を要求して Granite（5.16 以上）とぶつかるので、別の環境 `.venv-qwen-asr` に入れて、その環境でアプリや測定を動かす |
 | Voxtral Mini 4B Realtime | `"mistral-common[audio]>=1.9"`。GPU のメモリを約 9 GB 使う |
 | Granite 4.0 1B Speech・moonshine-base-ja | なし（transformers で動く） |
-| Haas-ja-v1.0・Parakeet CTC 1.1B 日本語 | 別の環境 `.venv-haas`（下の「Haas」）。NeMo 2.7 を使う |
+| Haas-ja-v1.0・Parakeet CTC 1.1B 日本語 | 別の環境 `.venv-haas`（下の「Haas」）。NeMo 2.7 を使う。`.venv` の asr_demo から選ぶと、`.venv-haas` の子プロセスで自動的に動く（`asrkit/worker.py`） |
 
 Haas（公式は Linux 専用だが、Windows 版の Triton を入れると動く。1 回目の認識はカーネルを作るので 10 秒ほどかかる）:
 
