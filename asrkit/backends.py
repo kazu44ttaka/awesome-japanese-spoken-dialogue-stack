@@ -642,6 +642,12 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "qwen3-asr-0.6b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-0.6B", device),
         "qwen3-asr-1.7b": lambda: Qwen3ASRTorch("Qwen/Qwen3-ASR-1.7B", device),
     }
+    runtime, _, key = name.partition("-")
+    if runtime in ("crispasr", "speechcpp", "audiocpp"):
+        # ggml 系の実行系のサーバー（runtimes/servers.py・runtimes/catalog.py）。例: speechcpp-haas-ja
+        from runtimes.servers import create_asr as create_runtime_asr
+
+        return create_runtime_asr(runtime, key, device=device, threads=threads)
     if name in _VENV_MODELS:
         import importlib.util
 

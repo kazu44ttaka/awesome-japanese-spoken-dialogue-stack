@@ -152,7 +152,9 @@ def make_backend(name: str, args: argparse.Namespace):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", required=True, choices=BACKENDS)
+    ap.add_argument("--backend", required=True,
+                    help="asrkit の名前、または ggml 系の実行系の構成（crispasr-<名前>・speechcpp-<名前>・audiocpp-<名前>。"
+                         "runtimes/catalog.py）")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--manifest", type=Path)
     src.add_argument("--dataset", choices=["fleurs-ja", *HF_SETS])
