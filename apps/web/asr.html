@@ -145,7 +145,6 @@ function getOptions() {
 }
 // 認識結果は MaAI-SDS の ASR の結果欄と同じ書き方: 途中経過は最後の行を上書きし、確定したら置き換えて改行
 let partialLine = null;  // 最後の行が途中経過なら、その要素
-let currentModel = 'asr';
 function putLine(line, final) {
   let el = partialLine;
   if (!el) { el = document.createElement('div'); el.className = 'line'; $('log').append(el); }
@@ -164,13 +163,11 @@ function connect() {
     const d = msg.data || [];
     switch (msg.type) {
       case 'hello':
-        if (msg.model) currentModel = msg.model;
         if (msg.model) { const i = models.findIndex((m) => m.name === msg.model); if (i >= 0) { $('model').selectedIndex = i; syncDevice(); } }
         if (msg.device) $('device').value = msg.device;
         setState(msg.state, msg.detail);
         break;
       case 'state':
-        if (d[0] === 'running') currentModel = models[$('model').selectedIndex].name;
         setState(d[0], d[1]);
         break;
       case 'status': setListenStatus(d[0]); break;
@@ -181,10 +178,10 @@ function connect() {
       case 'level': $('level').style.width = `${Math.round(d[0] * 100)}%`; break;
       case 'vad': $('vad').style.width = `${Math.round(d[0] * 100)}%`; break;
       case 'partial':
-        if (d[0]) putLine(`[${currentModel}-partial] ${d[0]} (latency=${(d[2] / 1000).toFixed(3)}s)`, false);
+        if (d[0]) putLine(`${d[0]} (latency=${(d[2] / 1000).toFixed(3)}s)`, false);
         break;
       case 'final':  // MaAI-SDS と同じく、空の確定は書かない
-        if (d[0]) putLine(`[${currentModel}] ${d[0]} (latency=${(d[3] / 1000).toFixed(3)}s)`, true);
+        if (d[0]) putLine(`${d[0]} (latency=${(d[3] / 1000).toFixed(3)}s)`, true);
         break;
     }
     syncButtons();

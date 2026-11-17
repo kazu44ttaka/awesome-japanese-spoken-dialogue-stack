@@ -26,7 +26,7 @@ from asr_core import (  # noqa: E402
 )
 
 from PySide6.QtCore import QObject, Signal  # noqa: E402
-from PySide6.QtGui import QFont, QTextCursor  # noqa: E402
+from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
     QMainWindow, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget,
@@ -217,7 +217,10 @@ class MainWindow(QMainWindow):
             cursor.removeSelectedText()
         elif not self.log.document().isEmpty():
             cursor.insertBlock()
-        cursor.insertText(line)
+        fmt = QTextCharFormat()
+        if not final:
+            fmt.setForeground(QColor("#888888"))  # 途中経過は灰色
+        cursor.insertText(line, fmt)
         self._partial_open = not final
         self.log.setTextCursor(cursor)
         self.log.ensureCursorVisible()
@@ -226,8 +229,6 @@ class MainWindow(QMainWindow):
         self.log.clear()
         self._partial_open = False
 
-    def _tag(self) -> str:
-        return self.session.model_name or "asr"
 
     # ---------------------------------------------------------------- actions
     def _start_model(self) -> None:
@@ -284,11 +285,11 @@ class MainWindow(QMainWindow):
         elif kind == "partial":
             text, _ms, latency = data
             if text:
-                self._put_line(f"[{self._tag()}-partial] {text} (latency={latency / 1000:.3f}s)", final=False)
+                self._put_line(f"{text} (latency={latency / 1000:.3f}s)", final=False)
         elif kind == "final":
             text, _ms, _audio_s, latency = data
             if text:  # MaAI-SDS と同じく、空の確定は書かない
-                self._put_line(f"[{self._tag()}] {text} (latency={latency / 1000:.3f}s)", final=True)
+                self._put_line(f"{text} (latency={latency / 1000:.3f}s)", final=True)
 
 
 def main() -> None:
