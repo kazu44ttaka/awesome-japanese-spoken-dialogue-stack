@@ -48,6 +48,7 @@ DEVICE_SPECS: dict[str, dict] = {
 DEVICE_CHOICES = {k: v["choices"] for k, v in DEVICE_SPECS.items()}
 FIXED_DEVICE: dict[str, str] = {
     "supertonic": "CPU",
+    "supertonic_cpp": "GPU（CUDA のサーバー）",
     "mio": "サーバーのビルドによる",
     "zonos3": "GPU（CUDA のサーバー）",
     "qwen3_tts_cpp": "GPU（CUDA のサーバー）",

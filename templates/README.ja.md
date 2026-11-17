@@ -73,10 +73,10 @@ python apps/asr_demo.py      # Web 版は python apps/asr_web.py（http://127.0.
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
-| ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER（21 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
+| ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER（23 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
 | ASR | 同じ 100 発話での処理時間を GPU・CPU（8 スレッド）に分けて測定 | [2026-11（処理時間）](benchmarks/asr/2026-11-timing.md) |
 | ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |
-| TTS | 短い文から長い文まで 20 文の合成時間・RTF と、3 つの ASR で書き起こした読みの CER（GPU・CPU に分けて 9 エンジン・16 構成） | [2026-11](benchmarks/tts/2026-11-tts.md) |
+| TTS | 短い文から長い文まで 20 文の合成時間・RTF と、3 つの ASR で書き起こした読みの CER（GPU・CPU に分けて 9 エンジン・18 構成） | [2026-11](benchmarks/tts/2026-11-tts.md) |
 | TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [2026-08](benchmarks/tts/2026-08-19.md) |
 | LLM | 音声対話での最初の文字までの時間（TTFT）と文字の出る速さ（LM Studio・10 モデル） | [2026-11](benchmarks/llm/2026-11-lmstudio.md) |
 

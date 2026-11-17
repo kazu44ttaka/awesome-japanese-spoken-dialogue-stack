@@ -23,11 +23,11 @@
 
 ## ページ
 
-- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 21 構成を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
+- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 23 構成（MaAI-SDS の設定 2 つを含む）を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
 - [asr/2026-11-timing.md](asr/2026-11-timing.md) — 同じ 100 発話での ASR の処理時間（GPU と CPU 8 スレッドを分けて）
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間
 - [asr/2026-11-jsut20.md](asr/2026-11-jsut20.md) — 新しい候補（Moonshine・Granite・Fun-ASR-MLT）と、句読点を除いた CER
-- [tts/2026-11-tts.md](tts/2026-11-tts.md) — TTS 9 エンジン（16 構成）の 20 文での合成時間と読みの CER（GPU・CPU を分けて）
+- [tts/2026-11-tts.md](tts/2026-11-tts.md) — TTS 9 エンジン（18 構成。MaAI-SDS の設定 2 つを含む）の 20 文での合成時間と読みの CER（GPU・CPU を分けて）
 - [tts/2026-08-19.md](tts/2026-08-19.md) — TTS 9 候補の速度・メモリ・ASR 検査
 - [llm/2026-11-lmstudio.md](llm/2026-11-lmstudio.md) — LLM 10 モデルの最初の文字までの時間と速さ（LM Studio）
 

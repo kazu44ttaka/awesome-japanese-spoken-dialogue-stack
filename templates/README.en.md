@@ -73,10 +73,10 @@ python apps/asr_demo.py      # web version: python apps/asr_web.py (http://127.0
 
 | Target | What | Results |
 |---|---|---|
-| ASR | Reading-based CER on three public test sets (FLEURS, ReazonSpeech, Common Voice; 21 configurations) | [2026-11 (three test sets)](benchmarks/asr/2026-11-3sets.md) (Japanese) |
+| ASR | Reading-based CER on three public test sets (FLEURS, ReazonSpeech, Common Voice; 23 configurations) | [2026-11 (three test sets)](benchmarks/asr/2026-11-3sets.md) (Japanese) |
 | ASR | Per-utterance latency on the same 100 utterances, measured separately on GPU and CPU (8 threads) | [2026-11 (latency)](benchmarks/asr/2026-11-timing.md) (Japanese) |
 | ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
-| TTS | Synthesis time and RTF on 20 short-to-long sentences, plus reading-based CER from three ASR models (9 engines in 16 configurations, GPU and CPU separately) | [2026-11](benchmarks/tts/2026-11-tts.md) (Japanese) |
+| TTS | Synthesis time and RTF on 20 short-to-long sentences, plus reading-based CER from three ASR models (9 engines in 18 configurations, GPU and CPU separately) | [2026-11](benchmarks/tts/2026-11-tts.md) (Japanese) |
 | TTS | Long-text RTF (synthesis time / audio length), memory, ASR round-trip check | [2026-08](benchmarks/tts/2026-08-19.md) (Japanese) |
 | LLM | Time to first token and tokens/s for dialogue replies (LM Studio, 10 models) | [2026-11](benchmarks/llm/2026-11-lmstudio.md) (Japanese) |
 

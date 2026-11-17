@@ -345,6 +345,16 @@ class Irodori:
         self.steps = int(cfg.get("steps", 40))  # 公式の既定（MeanFlow でないチェックポイント）
         # 参照音声（声のクローン）。省くとキャプションだけで声を決める（MaAI-SDS は参照音声と 16 ステップ）
         self.reference_audio = str(cfg.get("reference_audio", "") or "")
+        if self.reference_audio:
+            # Windows の torchaudio 2.9 以降の load は FFmpeg の DLL を要る torchcodec を使うので、soundfile で読む
+            import soundfile as sf
+            import torchaudio
+
+            def _load(path, *args, **kwargs):
+                x, rate = sf.read(str(path), dtype="float32", always_2d=True)
+                return torch.from_numpy(x.T.copy()), rate
+
+            torchaudio.load = _load
         self.schedule = str(cfg.get("t_schedule_mode", "linear"))  # 公式の高速化の例は steps=6 と sway
         self.captions = list(cfg.get("captions", ["明るく自然な日本語の声"]))
         self.runtime = InferenceRuntime.from_key(RuntimeKey(
