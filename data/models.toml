@@ -527,8 +527,8 @@ size = "—"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "クローンで読みの CER 0.006（CrispASR・1 文 約 1.4 秒）。audio.cpp では 1 文 約 10 秒と遅い"
-note_en = "Cloning with reading-based CER 0.006 (CrispASR, ~1.4 s per sentence); ~10 s per sentence with audio.cpp"
+note_ja = "クローンで読みの CER 0.006（CrispASR・1 文 約 1.4 秒・GPU メモリ 9 GB）。audio.cpp では GPU メモリが 11.6 GB まで増え、1 文 約 10 秒と遅い"
+note_en = "Cloning with reading-based CER 0.006 (CrispASR, ~1.4 s per sentence, 9 GB of GPU memory); audio.cpp grows to 11.6 GB of GPU memory and takes ~10 s per sentence"
 
 [[tts]]
 name = "Higgs Audio TTS 3 4B"
