@@ -5,7 +5,9 @@
 [English](README.en.md)
 
 - ローカルで動かせるモデルを中心に、**日本語にどれだけ対応しているか・ストリーミングできるか・ライセンス（商用利用）・動かし方** を並べています。
-- 一部のモデルは **同じ PC・同じ条件で実際に測った値**（文字誤り率、処理時間、RTF）と、測ったスクリプトを [benchmarks/](benchmarks/) に載せています。
+- **同じモデルを実行系ごとに比べられます。** 元の実装（PyTorch など）・sherpa-onnx・faster-whisper と、ggml 系の CrispASR・audio.cpp・speech.cpp で、
+  同じモデルの速さ・精度・メモリを同じ PC で測りました（[実行系の比較](benchmarks/2026-11-runtimes.md)）。同じモデルでも、実行系で数倍速くなったり、精度が落ちたりします。
+- **カバー範囲が広く**、日本語で使える主な ASR・TTS の多くを、**同じ PC・同じ条件で実際に測った値**（文字誤り率、処理時間、RTF、メモリ）と、測ったスクリプトとともに [benchmarks/](benchmarks/) に載せています。
 - 音声対話（話しかけて返事が返ってくるシステム）で使うことを前提に、**精度だけでなく遅延** を重視しています。
 
 > ライセンスは各モデルの公式ページを必ず確認してください。「要確認」はまだ確かめていないものです。
@@ -73,6 +75,7 @@ python apps/asr_demo.py      # Web 版は python apps/asr_web.py（http://127.0.
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
+| ASR・TTS | 同じモデルを実行系（元の実装・sherpa-onnx・CrispASR・audio.cpp・speech.cpp など）ごとに比べた速さ・精度・メモリ（ASR 18 モデル・TTS 22 モデル） | [2026-11（実行系の比較）](benchmarks/2026-11-runtimes.md) |
 | ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER（23 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
 | ASR | 同じ 100 発話での処理時間を GPU・CPU（8 スレッド）に分けて測定 | [2026-11（処理時間）](benchmarks/asr/2026-11-timing.md) |
 | ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |

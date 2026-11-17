@@ -23,6 +23,7 @@
 
 ## ページ
 
+- [2026-11-runtimes.md](2026-11-runtimes.md) — 同じモデルを実行系ごとに比較（元の実装・sherpa-onnx・faster-whisper・CrispASR・audio.cpp・speech.cpp）。ASR 18 モデル・TTS 22 モデルの速さ（GPU・CPU）・読みの CER・メモリ・読み込み時間
 - [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 23 構成（MaAI-SDS の設定 2 つを含む）を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
 - [asr/2026-11-timing.md](asr/2026-11-timing.md) — 同じ 100 発話での ASR の処理時間（GPU と CPU 8 スレッドを分けて）
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間

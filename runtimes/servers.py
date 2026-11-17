@@ -308,6 +308,8 @@ def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -
     options = dict(spec.get("options", {}))
     if runtime == "crispasr":
         extra = list(spec.get("args", []))
+        for u in spec.get("prefetch", []):  # サーバーが自分では取ってこない付属のファイル
+            fetch(u, CRISPASR_CACHE)
         if clone:
             ref = REF_WAV_24K if spec.get("ref_24k") else REF_WAV
             extra += ["--voice", str(ref)] + (["--ref-text", _ref_text(spec.get("kana", False))]

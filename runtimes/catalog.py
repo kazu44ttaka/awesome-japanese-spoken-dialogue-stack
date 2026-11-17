@@ -83,7 +83,9 @@ TTS: dict[str, dict[str, dict]] = {
         "moss-tts-local": {"backend": "moss-tts-local", "clone": True, "ref_text": False},
         "voxcpm2": {"backend": "voxcpm2-tts", "clone": True},
         "omnivoice": {"backend": "omnivoice", "args": ["--accept-license", "omnivoice-terms",  # 同意済み（2026-11-17）
-                                                       "--codec-model", "models/crispasr/omnivoice-tokenizer-q8_0.gguf"]},  # 同意済み（2026-11-17）
+                                                       "--codec-model", "models/crispasr/omnivoice-tokenizer-q8_0.gguf"],
+                      # 音声のトークナイザーはサーバーが自分では取ってこないので、先に取っておく
+                      "prefetch": ["https://huggingface.co/cstr/omnivoice-GGUF/resolve/main/omnivoice-tokenizer-q8_0.gguf"]},  # 同意済み（2026-11-17）
         "supertonic-3": {"backend": "supertonic", "voices": ["F1"], "quant": None, "args": ["--accept-license", "openrail-m"]},  # 同意済み（2026-11-17）
         # 公式の例のとおり、日本語は文も参照音声の書き起こしもカタカナで渡す（kana）。漢字のまま渡すと
         # 中国語に近い読みが混ざって崩れる（読みの CER 0.44 → カタカナで 0.016）

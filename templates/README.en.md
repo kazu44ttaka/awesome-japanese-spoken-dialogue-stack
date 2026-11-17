@@ -5,7 +5,9 @@ A curated list of **Japanese speech recognition (ASR), speech synthesis (TTS) an
 [日本語](README.md)
 
 - Focused on models you can run locally, with **Japanese support, streaming, license (commercial use) and runtime** side by side.
-- Some models have **numbers measured on the same machine under the same conditions** (character error rate, latency, RTF) together with the scripts, in [benchmarks/](benchmarks/).
+- **Compare the same model across runtimes.** The original implementation (PyTorch etc.), sherpa-onnx, faster-whisper and the ggml-based CrispASR, audio.cpp and speech.cpp,
+  measured for speed, accuracy and memory on the same machine ([runtime comparison](benchmarks/2026-11-runtimes.md), Japanese). The same model can be several times faster, or less accurate, depending on the runtime.
+- **Broad coverage**: most of the main ASR and TTS models usable for Japanese have **numbers measured on the same machine under the same conditions** (character error rate, latency, RTF, memory) together with the scripts, in [benchmarks/](benchmarks/).
 - Written with spoken dialogue systems in mind, so **latency matters as much as accuracy**.
 
 > Always check the official license of each model. "TBD" means we have not verified it yet.
@@ -73,6 +75,7 @@ python apps/asr_demo.py      # web version: python apps/asr_web.py (http://127.0
 
 | Target | What | Results |
 |---|---|---|
+| ASR, TTS | The same model on different runtimes (original implementation, sherpa-onnx, CrispASR, audio.cpp, speech.cpp, ...): speed, accuracy and memory (18 ASR and 22 TTS models) | [2026-11 (runtimes)](benchmarks/2026-11-runtimes.md) (Japanese) |
 | ASR | Reading-based CER on three public test sets (FLEURS, ReazonSpeech, Common Voice; 23 configurations) | [2026-11 (three test sets)](benchmarks/asr/2026-11-3sets.md) (Japanese) |
 | ASR | Per-utterance latency on the same 100 utterances, measured separately on GPU and CPU (8 threads) | [2026-11 (latency)](benchmarks/asr/2026-11-timing.md) (Japanese) |
 | ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
