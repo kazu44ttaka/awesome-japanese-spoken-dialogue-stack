@@ -15,9 +15,9 @@ MaAI-SDS の ASR と同じしくみ・同じ既定値。
 from __future__ import annotations
 
 import sys
-import time
 
-from html import escape
+
+
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -29,7 +29,7 @@ from PySide6.QtCore import QObject, Signal  # noqa: E402
 from PySide6.QtGui import QFont, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-    QMainWindow, QProgressBar, QPushButton, QTextEdit, QVBoxLayout, QWidget,
+    QMainWindow, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
 
 DEVICES = ["cuda", "cpu"]  # MaAI-SDS の ASR の Device と同じ
@@ -160,15 +160,13 @@ class MainWindow(QMainWindow):
         self.listen_status = QLabel("")
         self.listen_status.setStyleSheet("color:#777")
         meters.addWidget(self.listen_status, 1)
-        self.partial = QLabel("")
-        self.partial.setWordWrap(True)
-        self.partial.setStyleSheet("color: #777; padding: 4px 2px;")
-        lv.addWidget(self.partial)
-        self.log = QTextEdit()
+        # 認識結果（MaAI-SDS の ASR の結果欄と同じ書き方。途中経過は最後の行を上書きし、確定したら置き換えて改行）
+        self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setFont(QFont("Yu Gothic UI", 11))
         lv.addWidget(self.log, 1)
-        clear_btn.clicked.connect(self.log.clear)
+        self._partial_open = False  # 最後の行が途中経過か
+        clear_btn.clicked.connect(self._clear)
         root.addWidget(listen_box, 1)
 
         self._sync_device()
@@ -210,10 +208,26 @@ class MainWindow(QMainWindow):
         return ListenOptions.from_dict({"pseudo": self.pseudo_check.isChecked(),
                                         **{k: b.value() for k, b in self.fields.items()}})
 
-    def _append(self, html: str) -> None:
-        self.log.moveCursor(QTextCursor.MoveOperation.End)
-        self.log.insertHtml(html + "<br>")
-        self.log.moveCursor(QTextCursor.MoveOperation.End)
+    def _put_line(self, line: str, final: bool) -> None:
+        """途中経過は最後の行を上書きする。確定は途中経過の行を置き換え、次は新しい行から書く。"""
+        cursor = self.log.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        if self._partial_open:
+            cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+        elif not self.log.document().isEmpty():
+            cursor.insertBlock()
+        cursor.insertText(line)
+        self._partial_open = not final
+        self.log.setTextCursor(cursor)
+        self.log.ensureCursorVisible()
+
+    def _clear(self) -> None:
+        self.log.clear()
+        self._partial_open = False
+
+    def _tag(self) -> str:
+        return self.session.model_name or "asr"
 
     # ---------------------------------------------------------------- actions
     def _start_model(self) -> None:
@@ -236,7 +250,8 @@ class MainWindow(QMainWindow):
 
     def _stop(self) -> None:
         self.session.stop()
-        self.partial.setText("")
+        if self._partial_open:  # 確定しないまま止めたときは、途中経過の行を残して次は改行する
+            self._partial_open = False
         self.level.setValue(0)
         self.vad.setValue(0)
         self.listen_status.setText("")
@@ -267,15 +282,13 @@ class MainWindow(QMainWindow):
             if self.session.listening:
                 self.vad.setValue(int(data[0] * 100))
         elif kind == "partial":
-            text, ms = data
-            self.partial.setText(f"途中経過（{ms:.0f} ms）: {text}")
+            text, _ms, latency = data
+            if text:
+                self._put_line(f"[{self._tag()}-partial] {text} (latency={latency / 1000:.3f}s)", final=False)
         elif kind == "final":
-            text, ms, audio_s, latency = data
-            self.partial.setText("")
-            stamp = time.strftime("%H:%M:%S")
-            self._append(f"{stamp}&nbsp;&nbsp;{escape(text) or '（認識結果なし）'}")
-            self._append(f"<span style='color:#888'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;音声 {audio_s:.1f} 秒・"
-                         f"認識 {ms:.0f} ms・話し終わりから表示まで 約 {latency:.0f} ms</span>")
+            text, _ms, _audio_s, latency = data
+            if text:  # MaAI-SDS と同じく、空の確定は書かない
+                self._put_line(f"[{self._tag()}] {text} (latency={latency / 1000:.3f}s)", final=True)
 
 
 def main() -> None:

@@ -17,7 +17,9 @@ ASR（src/maai_sds/asr/service.py）と同じ:
 
 結果は emit(kind, ...) で知らせる（別のスレッドから呼ばれる）:
     ("state", state, 説明)  ("status", 文)  ("error", 文)  ("level", 0〜1)  ("vad", 確率)
-    ("partial", text, ms)  ("final", text, 認識 ms, 音声の秒数, 話し終わりから表示までの ms)
+    ("partial", text, 認識 ms, latency ms)  ("final", text, 認識 ms, 音声の秒数, latency ms)
+latency は MaAI-SDS と同じく、その音声を受け取ってから文字が出るまで（待ち行列の時間と認識の時間。確定では
+話し終わりを判定するまでの VAD OFF sec も足す）。
 """
 
 from __future__ import annotations
@@ -261,6 +263,7 @@ class AsrSession:
 
     # ---------------------------------------------------------------- loop
     def _submit(self, job: dict) -> None:
+        job["t"] = time.perf_counter()  # latency の起点（この音声を受け取った時刻）
         with self._jobs_cv:
             if job["mode"] == "partial":
                 # まだ認識していない途中経過は捨てて、新しいものだけ残す（MaAI-SDS の drop_oldest と同じ）
@@ -356,25 +359,28 @@ class AsrSession:
                     else:
                         text = clean_text(self.streamer.finish()) if self.streamer.stream is not None else ""
                 ms = (time.perf_counter() - t0) * 1000
+                latency = (time.perf_counter() - job["t"]) * 1000
                 if mode == "final":
-                    self.emit("final", text, ms, len(job["audio"]) / RATE, job["wait_ms"] + ms)
+                    self.emit("final", text, ms, len(job["audio"]) / RATE, job["wait_ms"] + latency)
                 elif text and text != self._last_partial:
                     self._last_partial = text
-                    self.emit("partial", text, ms)
+                    self.emit("partial", text, ms, latency)
                 continue
             if mode == "final" and job.get("short"):
                 # 短すぎる区間は認識しない。直前の途中経過があれば、それを確定にする
                 if self._last_partial:
-                    self.emit("final", self._last_partial, 0.0, len(job["audio"]) / RATE, job["wait_ms"])
+                    self.emit("final", self._last_partial, 0.0, len(job["audio"]) / RATE,
+                              job["wait_ms"] + (time.perf_counter() - job["t"]) * 1000)
                 self._last_partial = ""
                 continue
             text, ms = self._run(job["audio"])
+            latency = (time.perf_counter() - job["t"]) * 1000
             if mode == "partial":
                 self._last_partial = text
-                self.emit("partial", text, ms)
+                self.emit("partial", text, ms, latency)
             else:
                 self._last_partial = ""
-                self.emit("final", text, ms, len(job["audio"]) / RATE, job["wait_ms"] + ms)
+                self.emit("final", text, ms, len(job["audio"]) / RATE, job["wait_ms"] + latency)
 
     def _run(self, audio: np.ndarray) -> tuple[str, float]:
         t0 = time.perf_counter()

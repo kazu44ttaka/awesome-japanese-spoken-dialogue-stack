@@ -58,8 +58,7 @@
       <span>VAD</span><div class="meter"><div id="vad"></div></div>
       <span id="listenStatus" class="status"></span>
     </div>
-    <div id="partial" class="partial"></div>
-    <div id="log" class="log"></div>
+    <div id="log" class="log asrlog"></div>
   </section>
   <p class="note">マイクはこの PC で開いたとき（127.0.0.1 / localhost）だけ使えます。ほかの PC から開くときは HTTPS が必要です。</p>
 </main>
@@ -144,14 +143,15 @@ function getOptions() {
   for (const k of OPT_KEYS) o[k] = Number($(k).value);
   return o;
 }
-function addLine(text, meta) {
-  const line = document.createElement('div');
-  line.className = 'line';
-  line.textContent = `${new Date().toLocaleTimeString('ja-JP', {hour12: false})}  ${text || '（認識結果なし）'}`;
-  const m = document.createElement('div');
-  m.className = 'meta';
-  m.textContent = meta;
-  $('log').append(line, m);
+// 認識結果は MaAI-SDS の ASR の結果欄と同じ書き方: 途中経過は最後の行を上書きし、確定したら置き換えて改行
+let partialLine = null;  // 最後の行が途中経過なら、その要素
+let currentModel = 'asr';
+function putLine(line, final) {
+  let el = partialLine;
+  if (!el) { el = document.createElement('div'); el.className = 'line'; $('log').append(el); }
+  el.textContent = line;
+  el.classList.toggle('partial', !final);
+  partialLine = final ? null : el;
   $('log').scrollTop = $('log').scrollHeight;
 }
 
@@ -164,11 +164,15 @@ function connect() {
     const d = msg.data || [];
     switch (msg.type) {
       case 'hello':
+        if (msg.model) currentModel = msg.model;
         if (msg.model) { const i = models.findIndex((m) => m.name === msg.model); if (i >= 0) { $('model').selectedIndex = i; syncDevice(); } }
         if (msg.device) $('device').value = msg.device;
         setState(msg.state, msg.detail);
         break;
-      case 'state': setState(d[0], d[1]); break;
+      case 'state':
+        if (d[0] === 'running') currentModel = models[$('model').selectedIndex].name;
+        setState(d[0], d[1]);
+        break;
       case 'status': setListenStatus(d[0]); break;
       case 'error': setListenStatus(d[0], true); break;
       case 'listening':
@@ -176,10 +180,11 @@ function connect() {
         break;
       case 'level': $('level').style.width = `${Math.round(d[0] * 100)}%`; break;
       case 'vad': $('vad').style.width = `${Math.round(d[0] * 100)}%`; break;
-      case 'partial': $('partial').textContent = `途中経過（${d[1].toFixed(0)} ms）: ${d[0]}`; break;
-      case 'final':
-        $('partial').textContent = '';
-        addLine(d[0], `音声 ${d[2].toFixed(1)} 秒・認識 ${d[1].toFixed(0)} ms・話し終わりから表示まで 約 ${d[3].toFixed(0)} ms`);
+      case 'partial':
+        if (d[0]) putLine(`[${currentModel}-partial] ${d[0]} (latency=${(d[2] / 1000).toFixed(3)}s)`, false);
+        break;
+      case 'final':  // MaAI-SDS と同じく、空の確定は書かない
+        if (d[0]) putLine(`[${currentModel}] ${d[0]} (latency=${(d[3] / 1000).toFixed(3)}s)`, true);
         break;
     }
     syncButtons();
@@ -220,7 +225,7 @@ function stopMic() {
   if (audioCtx) { audioCtx.close(); audioCtx = null; }
   $('level').style.width = '0';
   $('vad').style.width = '0';
-  $('partial').textContent = '';
+  partialLine = null;  // 確定しないまま止めたときは、途中経過の行を残して次は改行する
 }
 function stopListening(send = true) {
   if (send && ws && ws.readyState === 1) ws.send(JSON.stringify({type: 'unlisten'}));
@@ -246,7 +251,7 @@ $('listen').onclick = async () => {
   ws.send(JSON.stringify({type: 'listen', options: getOptions()}));
 };
 $('unlisten').onclick = () => stopListening();
-$('clear').onclick = () => { $('log').textContent = ''; };
+$('clear').onclick = () => { $('log').textContent = ''; partialLine = null; };
 $('resetOpts').onclick = () => setOptions(defaults);
 
 fetch('/api/models').then((r) => r.json()).then((j) => {
