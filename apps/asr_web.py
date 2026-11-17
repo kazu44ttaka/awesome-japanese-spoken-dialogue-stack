@@ -1,10 +1,10 @@
 """ASR デモの Web 版。ブラウザのマイクの声をこの PC に送って認識する。
 
-    uv pip install "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"   # PySide6 は GUI 版だけで使う
+    uv pip install fastapi "uvicorn[standard]" "silero-vad==6.2.1"
     python apps/asr_web.py            # http://127.0.0.1:8765 を開く
     python apps/asr_web.py --host 0.0.0.0 --port 8765 --no-browser
 
-- 中身（VAD で区切って認識する部分）は PySide6 版と同じ apps/asr_core.py
+- 中身（区切り方と疑似ストリーミング）は PySide6 版と同じ apps/asr_core.py（MaAI-SDS と同じしくみ・既定値）
 - ブラウザは 48 kHz などで録音した音を 16 kHz に変換し、WebSocket で送る
 - ブラウザのマイクは「安全な接続」でしか使えない。この PC で開く（127.0.0.1 / localhost）なら使えるが、
   ほかの PC から http://<IP>:8765 で開くとマイクを使えない（HTTPS にするか、ブラウザの設定で許可する）
@@ -19,12 +19,15 @@ import json
 import sys
 import threading
 import webbrowser
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from asr_core import DEFAULT_MODEL, AsrSession, ListenOptions, model_choices  # noqa: E402
+from asr_core import (  # noqa: E402
+    DEFAULT_MODEL, STATE_COLORS, STATE_LABELS, AsrSession, ListenOptions, model_choices,
+)
 
 try:
     import uvicorn
@@ -45,22 +48,21 @@ class Hub:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.queue: asyncio.Queue | None = None
         self.owner = 0  # いまの接続の番号
-        self.last_status = "モデルを選んで「読み込み」を押してください"
         self.session = AsrSession(self.emit)
         self.lock = threading.Lock()
 
     def emit(self, kind: str, *data) -> None:
-        if kind in ("status", "loaded", "error"):
-            self.last_status = data[0]
         if self.loop is None or self.queue is None:
+            return
+        if kind in ("level", "vad") and not self.session.listening:
             return
         msg = {"type": kind, "data": list(data)}
         self.loop.call_soon_threadsafe(self.queue.put_nowait, msg)
 
     def state(self) -> dict:
         s = self.session
-        return {"type": "state", "model": s.model_name, "ready": s.ready, "loading": s.loading,
-                "listening": s.listening, "status": self.last_status}
+        return {"type": "hello", "model": s.model_name, "device": s.device, "state": s.state, "detail": s.state_detail,
+                "listening": s.listening}
 
 
 hub = Hub()
@@ -75,7 +77,8 @@ def index() -> FileResponse:
 
 @app.get("/api/models")
 def models() -> JSONResponse:
-    return JSONResponse({"models": model_choices(), "default": DEFAULT_MODEL})
+    return JSONResponse({"models": model_choices(), "default": DEFAULT_MODEL, "options": asdict(ListenOptions()),
+                         "state_labels": STATE_LABELS, "state_colors": STATE_COLORS})
 
 
 @app.websocket("/ws")
@@ -92,10 +95,7 @@ async def ws(socket: WebSocket) -> None:
 
     async def sender() -> None:
         while True:
-            msg = await queue.get()
-            if msg["type"] == "level" and not hub.session.listening:
-                continue
-            await socket.send_json(msg)
+            await socket.send_json(await queue.get())
 
     task = asyncio.create_task(sender())
     try:
@@ -111,22 +111,21 @@ async def ws(socket: WebSocket) -> None:
                 continue
             req = json.loads(msg.get("text") or "{}")
             kind = req.get("type")
-            if kind == "load":
-                hub.session.load(str(req.get("name", DEFAULT_MODEL)), str(req.get("device", "cpu")), threads=8)
-            elif kind == "start":
+            if kind == "start_model":
+                await asyncio.to_thread(hub.session.stop)
+                hub.session.start_model(str(req.get("name", DEFAULT_MODEL)), str(req.get("device", "cpu")), threads=8)
+            elif kind == "stop_model":
+                await asyncio.to_thread(hub.session.stop_model)
+            elif kind == "listen":
                 try:
-                    hub.session.start(ListenOptions(partial=bool(req.get("partial", True)),
-                                                    interval_ms=int(req.get("interval_ms", 500)),
-                                                    min_silence=float(req.get("min_silence", 0.4))),
-                                      use_local_mic=False)
-                    await socket.send_json({"type": "listening", "data": [True]})
+                    options = ListenOptions.from_dict(req.get("options") or {})
+                    await asyncio.to_thread(hub.session.start, options, None, False)
+                    await socket.send_json({"type": "listening", "data": [True, hub.session.streamer is not None]})
                 except Exception as ex:  # noqa: BLE001
                     await socket.send_json({"type": "error", "data": [f"開始できませんでした: {ex}"]})
-            elif kind == "stop":
-                hub.session.stop()
-                await socket.send_json({"type": "listening", "data": [False]})
-            elif kind == "state":
-                await socket.send_json(hub.state())
+            elif kind == "unlisten":
+                await asyncio.to_thread(hub.session.stop)
+                await socket.send_json({"type": "listening", "data": [False, False]})
     except WebSocketDisconnect:
         pass
     finally:

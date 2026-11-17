@@ -68,3 +68,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 .log .meta { color: var(--muted); font-size: 13px; padding-left: 2em; }
 .log .line { margin-top: 4px; }
 .note { color: var(--muted); font-size: 13px; }
+h2 { font-size: 15px; margin: 0 0 6px; }
+h2 small { font-weight: normal; color: var(--muted); margin-left: 6px; }
+.grid { display: grid; grid-template-columns: max-content 7em max-content 7em; gap: 6px 10px; align-items: center; margin: 6px 0; }
+.grid label { color: var(--muted); }
+@media (max-width: 560px) { .grid { grid-template-columns: max-content 7em; } }
+.state { display: inline-flex; align-items: center; gap: 6px; font-weight: bold; min-width: 5em; }
+.lamp { width: 12px; height: 12px; border-radius: 50%; background: #9e9e9e; display: inline-block; }

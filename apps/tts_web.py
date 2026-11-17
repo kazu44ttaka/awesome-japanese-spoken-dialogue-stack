@@ -4,9 +4,9 @@
     .venv-tts/Scripts/python apps/tts_web.py          # http://127.0.0.1:8766 を開く
     .venv-tts/Scripts/python apps/tts_web.py --host 0.0.0.0 --no-browser
 
-- 中身（文ごとの合成）は PySide6 版と同じ apps/tts_core.py
-- 「文ごとに合成」では、できた文から WebSocket で WAV を送り、ブラウザが順に再生する。
-  ページに出す「最初の音まで」は、ボタンを押してからブラウザで再生が始まるまで（通信の時間も含む）
+- 中身（エンジンの起動と文ごとの合成）は PySide6 版と同じ apps/tts_core.py
+- 「文ごとに合成」では、できた文から WebSocket で WAV を送り、ブラウザが切れ目なく順に再生する。
+  ページに出す「ブラウザで鳴るまで」は、ボタンを押してからブラウザで再生が始まるまで（通信の時間も含む）
 - 同時に使えるのは 1 つのページだけ（あとから開いたページが引き継ぐ）
 """
 
@@ -21,7 +21,9 @@ import webbrowser
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tts_core import DEFAULT_ENGINE, SAMPLES, TtsSession, engine_choices, to_wav_bytes  # noqa: E402
+from tts_core import (  # noqa: E402
+    DEFAULT_ENGINE, SAMPLES, STATE_COLORS, STATE_LABELS, TtsSession, engine_choices, to_wav_bytes,
+)
 
 try:
     import uvicorn
@@ -42,20 +44,15 @@ class Hub:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.queue: asyncio.Queue | None = None
         self.owner = 0
-        self.last_status = "エンジンを選んで「読み込み」を押してください"
         self.session = TtsSession(self.emit)
         self.lock = threading.Lock()
 
     def emit(self, kind: str, *data) -> None:
-        if kind in ("status", "error"):
-            self.last_status = data[0]
         if kind == "audio":
             i, audio, rate = data
             msg = {"type": "audio", "index": i, "wav": to_wav_bytes(audio, rate)}
-        elif kind == "loaded":
-            voices, secs = data
-            self.last_status = f"読み込み完了（{secs:.1f} 秒）・声 {len(voices)} 種類"
-            msg = {"type": "loaded", "data": [[list(v) for v in voices], secs]}
+        elif kind == "voices":
+            msg = {"type": "voices", "data": [[list(v) for v in data[0]]]}
         else:
             msg = {"type": kind, "data": list(data)}
         if self.loop is not None and self.queue is not None:
@@ -63,8 +60,8 @@ class Hub:
 
     def state(self) -> dict:
         s = self.session
-        return {"type": "state", "engine": s.engine_name, "ready": s.ready, "loading": s.loading,
-                "voices": [list(v) for v in s.voices], "status": self.last_status}
+        return {"type": "hello", "engine": s.engine_name, "device": s.device, "state": s.state,
+                "detail": s.state_detail, "voices": [list(v) for v in s.voices]}
 
 
 hub = Hub()
@@ -79,7 +76,8 @@ def index() -> FileResponse:
 
 @app.get("/api/engines")
 def engines() -> JSONResponse:
-    return JSONResponse({"engines": engine_choices(), "default": DEFAULT_ENGINE, "samples": SAMPLES})
+    return JSONResponse({"engines": engine_choices(), "default": DEFAULT_ENGINE, "samples": SAMPLES,
+                         "state_labels": STATE_LABELS, "state_colors": STATE_COLORS})
 
 
 @app.get("/api/last.wav")
@@ -121,19 +119,15 @@ async def ws(socket: WebSocket) -> None:
                 await socket.send_json({"type": "error", "data": ["ほかのページが使い始めたので止めました。再読み込みしてください"]})
                 break
             kind = req.get("type")
-            if kind == "load":
-                hub.session.load(str(req.get("name", DEFAULT_ENGINE)))
-            elif kind == "start_engine":
-                hub.session.start_engine(str(req.get("name", DEFAULT_ENGINE)), use_gpu=bool(req.get("use_gpu", True)))
+            if kind == "start":
+                hub.session.start(str(req.get("name", DEFAULT_ENGINE)), req.get("device") or None)
+            elif kind == "stop_engine":
+                hub.session.stop_engine()
             elif kind == "speak":
                 hub.session.speak(str(req.get("text", "")), voice=req.get("voice") or None,
                                   speed=float(req.get("speed", 1.0)), split=bool(req.get("split", True)))
-            elif kind == "stop":
+            elif kind == "halt":
                 hub.session.stop()
-            elif kind == "reset":
-                await asyncio.to_thread(hub.session.close)
-                hub.last_status = "エンジンを選んで「読み込み」を押してください"
-                await socket.send_json(hub.state())
     except WebSocketDisconnect:
         pass
     finally:

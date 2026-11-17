@@ -60,9 +60,10 @@ We measure what matters for dialogue — **time to first token and tokens per se
 
 ```
 uv venv --python 3.11 .venv
-uv pip install sherpa-onnx sounddevice soundfile numpy      # enough for the sherpa-onnx models (no PyTorch)
-uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # for transformers / funasr models
-uv pip install "transformers>=5.16" funasr
+uv pip install sherpa-onnx sounddevice soundfile numpy
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128
+uv pip install --no-deps "silero-vad==6.2.1"               # voice activity detection (same as MaAI-SDS)
+uv pip install "transformers>=5.16" funasr                 # for transformers / funasr models
 uv pip install "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"   # desktop UI (PySide6) and web version
 python apps/asr_demo.py      # web version: python apps/asr_web.py (http://127.0.0.1:8765)
 .venv-tts/Scripts/python apps/tts_demo.py   # TTS uses its own environment (apps/README.md); web version: apps/tts_web.py

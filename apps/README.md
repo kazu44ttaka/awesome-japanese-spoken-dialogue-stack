@@ -10,14 +10,21 @@
 - 中身は共通（[asr_core.py](asr_core.py)・[tts_core.py](tts_core.py)）なので、どちらでも同じモデル・同じ設定で動く
 - ブラウザのマイクは安全な接続でしか使えない。この PC で開く（127.0.0.1 / localhost）なら使えるが、`--host 0.0.0.0` でほかの PC から開くときは HTTPS が要る（TTS の再生はそのまま使える）
 - Web 版を同時に使えるのは 1 つのページだけ（あとから開いたページが引き継ぐ）
+- 使い方はどれも同じ: モデル（エンジン）とデバイスを選んで「起動」→ 状態が「稼働」になったら使える →「停止」で閉じる。
+  状態は MaAI-SDS と同じ 4 つ（停止・起動中・稼働・異常）。TTS の AivisSpeech / VOICEVOX は、エンジンが動いていなければ
+  「起動」で立ち上げ、「停止」で止める（前から動いていたエンジンはそのまま）
+- ASR の区切り方と疑似ストリーミングは MaAI-SDS と同じしくみ・同じ既定値（Silero VAD の確率で判定。開始 0.7 が 0.1 秒、
+  終了 0.3 が 0.1 秒、プリロール 0.2 秒、途中経過は音声 0.25 秒ごと、0.4 秒より短い区間は直前の途中経過で確定）。
+  画面で変えられる
 
 ## ASR デモ
 
 ```
 uv venv --python 3.11 .venv
 uv pip install --python .venv sherpa-onnx sounddevice soundfile numpy "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"
-# transformers / funasr のモデルも使うなら
 uv pip install --python .venv torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+uv pip install --python .venv --no-deps "silero-vad==6.2.1"   # 発話区間検出（MaAI-SDS と同じ版。torch を入れ替えないよう --no-deps）
+# transformers / funasr のモデルも使うなら
 uv pip install --python .venv "transformers>=5.16" funasr
 .venv/Scripts/python apps/asr_demo.py   # デスクトップ版
 .venv/Scripts/python apps/asr_web.py    # Web 版（--host / --port / --no-browser）

@@ -3,18 +3,22 @@
 エンジンの場所（モデル・実行ファイル・辞書など）は apps/tts_engines.toml に書く
 （apps/tts_engines.example.toml をコピー）。
 
-- 「文ごとに合成」を入れると、文に分けて 1 文ずつ合成し、できた文から渡す（音声対話と同じ）。
-  最初の音が出るまでの時間（TTFA）が、全文をまとめて合成するときと比べてどれだけ短くなるかが分かる
-- 文ごとに、合成にかかった時間・音声の長さ・RTF（合成時間 ÷ 音声の長さ）を出す
+- 「起動」でエンジンを使えるようにする。AivisSpeech / VOICEVOX はエンジンが動いていなければ立ち上げ、
+  どのエンジンも声の一覧を取って 1 回試しに合成する（ウォームアップ）。「停止」で止める
+  （このアプリが立ち上げたエンジンだけ止め、前から動いていたエンジンはそのまま）
+- 状態は MaAI-SDS と同じ 4 つ: 停止（stopped）・起動中（starting）・稼働（running）・異常（error）
+- 「デバイス」は、エンジンが GPU / CPU を選べるときだけ選べる（設定の device / acceleration / --use_gpu に入れる）
+- 「文ごとに合成」を入れると、文に分けて 1 文ずつ合成し、できた文から渡す（音声対話と同じ）
 
 結果は emit(kind, ...) で知らせる（別のスレッドから呼ばれる）:
-    ("status", 文)  ("loaded", voices, 秒)  ("error", 文)
+    ("state", state, 説明)  ("voices", [(id, 表示名), ...])  ("status", 文)  ("error", 文)
     ("audio", 文の番号, audio, rate)  ("sentence", i, n, 文, 合成 ms, 音声の秒数)
     ("done", 最初の音までの ms | None, 全体の ms, 音声の秒数, 文の数)
 """
 
 from __future__ import annotations
 
+import copy
 import io
 import sys
 import threading
@@ -28,7 +32,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ttskit.backends import BACKENDS, VoicevoxCompatible, create, load_config, split_sentences  # noqa: E402
 
 DEFAULT_ENGINE = "aivisspeech"
-HTTP_ENGINES = ("aivisspeech", "voicevox")  # アプリからエンジンを起動できるもの
+HTTP_ENGINES = ("aivisspeech", "voicevox")  # 別に動くエンジンへ HTTP でつなぐもの（なければ立ち上げる）
+
+# エンジンごとのデバイスの選択肢（先頭が既定）。ここに無いエンジンは選べない（固定の説明だけ出す）
+DEVICE_CHOICES: dict[str, list[str]] = {
+    "aivisspeech": ["GPU", "CPU"],
+    "voicevox": ["GPU", "CPU"],
+    "voicevox_core": ["GPU", "CPU"],
+    "irodori": ["GPU", "CPU"],
+    "kitten": ["GPU", "CPU"],
+    "moss_nano": ["CPU", "GPU"],
+}
+FIXED_DEVICE: dict[str, str] = {
+    "supertonic": "CPU",
+    "mio": "サーバーのビルドによる",
+    "zonos3": "GPU（CUDA のサーバー）",
+    "qwen3_tts_cpp": "GPU（CUDA のサーバー）",
+    "lfm_audio": "GPU",
+    "qwen3-tts": "GPU",
+    "tsukasa": "GPU",
+    "kokoro": "既定",
+}
+
+STATE_LABELS = {"stopped": "停止", "starting": "起動中", "running": "稼働", "error": "異常"}
+STATE_COLORS = {"stopped": "#9e9e9e", "starting": "#f0b429", "running": "#43a047", "error": "#e53935"}
 
 SAMPLES = {
     "あいさつ": "こんにちは。今日はいい天気ですね。何かお手伝いできることはありますか？",
@@ -42,8 +69,10 @@ Emit = Callable[..., None]
 
 
 def engine_choices() -> list[dict]:
-    """[{name, label, note, http}]。GUI と Web のエンジンの一覧。"""
-    return [{"name": b.name, "label": b.label, "note": b.note, "http": b.name in HTTP_ENGINES} for b in BACKENDS.values()]
+    """[{name, label, note, http, devices, fixed_device}]。GUI と Web のエンジンの一覧。"""
+    return [{"name": b.name, "label": b.label, "note": b.note, "http": b.name in HTTP_ENGINES,
+             "devices": DEVICE_CHOICES.get(b.name, []), "fixed_device": FIXED_DEVICE.get(b.name, "既定")}
+            for b in BACKENDS.values()]
 
 
 def to_wav_bytes(audio: np.ndarray, rate: int) -> bytes:
@@ -54,81 +83,123 @@ def to_wav_bytes(audio: np.ndarray, rate: int) -> bytes:
     return buf.getvalue()
 
 
+def _with_device(config: dict, name: str, device: str | None) -> dict:
+    """デバイスの選択を、そのエンジンの設定の書き方に直して入れる。"""
+    cfg = copy.deepcopy(config)
+    if not device or name not in DEVICE_CHOICES or name in HTTP_ENGINES:
+        return cfg
+    sec = cfg.setdefault(name, {})
+    gpu = device.upper() == "GPU"
+    if name == "voicevox_core":
+        sec["acceleration"] = "GPU" if gpu else "CPU"
+    else:
+        sec["device"] = "cuda" if gpu else "cpu"
+    return cfg
+
+
 class TtsSession:
-    """エンジンの読み込みと、文ごとの合成（別スレッド）。"""
+    """エンジンの起動・停止と、文ごとの合成（別スレッド）。"""
 
     def __init__(self, emit: Emit, config: dict | None = None) -> None:
         self.emit = emit
         self.config = config if config is not None else load_config()
         self.tts = None
         self.engine_name: str | None = None
+        self.device: str | None = None
         self.voices: list[tuple[str, str]] = []
-        self.loading = False
+        self.state = "stopped"
+        self.state_detail = ""
         self.speaking = False
         self.cancel = threading.Event()
         self.last_audio: list[tuple[np.ndarray, int]] = []
         self._lock = threading.Lock()
+        self._watch_stop = threading.Event()
+        threading.Thread(target=self._watch, daemon=True).start()
 
     @property
     def ready(self) -> bool:
-        return self.tts is not None and not self.loading
+        return self.tts is not None and self.state == "running"
+
+    def _set_state(self, state: str, detail: str = "") -> None:
+        self.state, self.state_detail = state, detail
+        self.emit("state", state, detail)
 
     # ---------------------------------------------------------------- engine
-    def load(self, name: str) -> None:
+    def start(self, name: str, device: str | None = None) -> None:
+        """エンジンを使えるようにする（HTTP のエンジンは動いていなければ立ち上げる）。"""
         if name not in BACKENDS:
             self.emit("error", f"知らないエンジンです: {name}")
             return
-        self.stop()
-        self.loading = True
-        self.emit("status", "読み込み中…（初回はモデルのダウンロードに時間がかかります）")
+        if self.state == "starting":
+            return
+        self.cancel.set()
+        choices = DEVICE_CHOICES.get(name, [])
+        device = device if device in choices else (choices[0] if choices else None)
+        self._set_state("starting", f"{BACKENDS[name].label} を起動しています…")
 
         def run() -> None:
             try:
                 with self._lock:
                     self._close_engine()
                     t0 = time.perf_counter()
-                    tts = create(name, self.config)
+                    tts = create(name, _with_device(self.config, name, device))
                     if not tts.available():
-                        raise RuntimeError("エンジンにつながりません。エンジンを起動してから読み込んでください")
+                        if isinstance(tts, VoicevoxCompatible):
+                            self.emit("status", "エンジンが動いていないので立ち上げています…（1 分ほどかかることがあります）")
+                            if not tts.start_engine(use_gpu=(device or "GPU").upper() == "GPU"):
+                                raise RuntimeError("エンジンを立ち上げられませんでした（既定の場所に入っていないかもしれません）")
+                        else:
+                            raise RuntimeError("エンジンにつながりません（apps/tts_engines.toml の設定を確かめてください）")
+                    self.emit("status", "声の一覧を取って、試しに合成しています…（初回はモデルのダウンロードに時間がかかります）")
                     voices = [tuple(v) for v in tts.voices()]
                     if not voices:
                         raise RuntimeError("声が見つかりません")
                     tts.synthesize("テストです。", voice=voices[0][0])  # ウォームアップ
-                    self.tts, self.engine_name, self.voices = tts, name, voices
-                self.loading = False
-                self.emit("loaded", voices, time.perf_counter() - t0)
+                    self.tts, self.engine_name, self.device, self.voices = tts, name, device, voices
+                self.emit("voices", voices)
+                where = device or FIXED_DEVICE.get(name, "既定")
+                note = ""
+                if isinstance(tts, VoicevoxCompatible) and tts.process is None:
+                    note = "・前から動いていたエンジンを使用（デバイスはそのエンジンの起動のしかたのまま）"
+                self._set_state("running", f"{BACKENDS[name].label}・{where}・声 {len(voices)} 種類"
+                                           f"（{time.perf_counter() - t0:.1f} 秒）{note}")
             except Exception as ex:  # noqa: BLE001
-                self.loading = False
-                self.emit("error", f"読み込めませんでした: {type(ex).__name__}: {ex}")
+                self._set_state("error", f"起動できませんでした: {type(ex).__name__}: {ex}")
 
         threading.Thread(target=run, daemon=True).start()
 
-    def start_engine(self, name: str, use_gpu: bool = True) -> None:
-        """AivisSpeech / VOICEVOX のエンジンを起動する（入っていれば）。"""
-        self.emit("status", "エンジンを起動しています…（1 分ほどかかることがあります）")
+    def stop_engine(self) -> None:
+        """エンジンを止める（このアプリが立ち上げたサーバーや子プロセスも止める）。"""
+        self.cancel.set()
 
         def run() -> None:
-            try:
-                engine = create(name, self.config)
-                ok = isinstance(engine, VoicevoxCompatible) and engine.start_engine(use_gpu=use_gpu)
-            except Exception:  # noqa: BLE001
-                ok = False
-            self.emit("status", "エンジンが起動しました。「読み込み」を押してください" if ok
-                      else "エンジンを起動できませんでした（既定の場所に入っていないかもしれません）")
+            with self._lock:
+                self._close_engine()
+            self._set_state("stopped", "")
+            self.emit("voices", [])
 
         threading.Thread(target=run, daemon=True).start()
 
     def _close_engine(self) -> None:
-        close = getattr(self.tts, "close", None)  # アプリが起動したサーバーや子プロセスを止める
+        close = getattr(self.tts, "close", None)
         if callable(close):
             try:
                 close()
             except Exception:  # noqa: BLE001
                 pass
-        self.tts, self.engine_name, self.voices = None, None, []
+        self.tts, self.engine_name, self.device, self.voices = None, None, None, []
+
+    def _watch(self) -> None:
+        """HTTP のエンジンが外で止められたら「異常」にする。"""
+        while not self._watch_stop.wait(3.0):
+            tts = self.tts
+            if self.state == "running" and isinstance(tts, VoicevoxCompatible) and not self.speaking:
+                if not tts.available():
+                    self._set_state("error", "エンジンが応答しません（止まったかもしれません）。もう一度「起動」してください")
 
     def close(self) -> None:
-        self.stop()
+        self.cancel.set()
+        self._watch_stop.set()
         with self._lock:
             self._close_engine()
 
@@ -138,13 +209,14 @@ class TtsSession:
         if not text:
             return
         if not self.ready:
-            self.emit("error", "先にエンジンを読み込んでください")
+            self.emit("error", "先にエンジンを「起動」してください")
             return
         voice = voice or self.voices[0][0]
         sentences = split_sentences(text) if split else [text]
         self.cancel.clear()
         self.last_audio = []
         self.speaking = True
+        tts = self.tts
 
         def run() -> None:
             t_click = time.perf_counter()
@@ -157,7 +229,7 @@ class TtsSession:
                     t0 = time.perf_counter()
                     try:
                         with self._lock:
-                            audio, rate = self.tts.synthesize(sentence, voice=voice, speed=speed)
+                            audio, rate = tts.synthesize(sentence, voice=voice, speed=speed)
                     except Exception as ex:  # noqa: BLE001
                         self.emit("error", f"合成に失敗しました: {ex}")
                         break
@@ -177,6 +249,7 @@ class TtsSession:
         threading.Thread(target=run, daemon=True).start()
 
     def stop(self) -> None:
+        """合成を途中でやめる（エンジンは止めない）。"""
         self.cancel.set()
 
     def joined_audio(self) -> tuple[np.ndarray, int] | None:

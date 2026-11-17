@@ -137,6 +137,7 @@ class VoicevoxCompatible:
     def __init__(self, base_url: str, exe_candidates: list[Path]) -> None:
         self.base_url = base_url.rstrip("/")
         self.exe_candidates = exe_candidates
+        self.process: subprocess.Popen | None = None  # このアプリが起動したエンジン（close で止める）
 
     def available(self) -> bool:
         try:
@@ -152,15 +153,27 @@ class VoicevoxCompatible:
         exe = next((p for p in self.exe_candidates if p.is_file()), None)
         if exe is None:
             return False
-        subprocess.Popen([str(exe), *(["--use_gpu"] if use_gpu else [])], cwd=str(exe.parent),
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.process = subprocess.Popen([str(exe), *(["--use_gpu"] if use_gpu else [])], cwd=str(exe.parent),
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         deadline = time.monotonic() + wait_sec
         while time.monotonic() < deadline:
             if self.available():
                 return True
+            if self.process.poll() is not None:
+                return False
             time.sleep(1.0)
         return False
+
+    def close(self) -> None:
+        """このアプリが起動したエンジンだけ止める（前から動いていたエンジンはそのまま）。"""
+        if self.process is not None and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=10)
+            except Exception:  # noqa: BLE001
+                self.process.kill()
+        self.process = None
 
     def voices(self) -> list[tuple[str, str]]:
         out = []

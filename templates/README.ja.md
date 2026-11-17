@@ -60,9 +60,10 @@
 
 ```
 uv venv --python 3.11 .venv
-uv pip install sherpa-onnx sounddevice soundfile numpy      # sherpa-onnx のモデルだけなら PyTorch 不要
-uv pip install torch --index-url https://download.pytorch.org/whl/cu128   # transformers / funasr のモデルも使うなら
-uv pip install "transformers>=5.16" funasr
+uv pip install sherpa-onnx sounddevice soundfile numpy
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128
+uv pip install --no-deps "silero-vad==6.2.1"               # 発話区間検出（MaAI-SDS と同じ）
+uv pip install "transformers>=5.16" funasr                 # transformers / funasr のモデルも使うなら
 uv pip install "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"   # アプリの画面（PySide6）と Web 版
 python apps/asr_demo.py      # Web 版は python apps/asr_web.py（http://127.0.0.1:8765）
 .venv-tts/Scripts/python apps/tts_demo.py   # TTS は別の環境（apps/README.md）。Web 版は apps/tts_web.py
