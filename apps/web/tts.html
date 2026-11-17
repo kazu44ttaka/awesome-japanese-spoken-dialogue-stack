@@ -101,13 +101,27 @@ function addLog(text, meta) {
   $('log').scrollTop = $('log').scrollHeight;
 }
 
+// 再生の仕組み（AudioContext）は最初に画面を触ったときに作り、ずっと動かしておく（無音を流し続ける）。
+// 鳴らす直前に作ると、デバイスが動き出すまで（Bluetooth などでは数百 ms）に 1 文目の頭が消えるため
+let readyAt = 0;  // デバイスが動き出したとみなす時刻（AudioContext の時計）
 async function ensureAudio() {
-  if (!audioCtx) audioCtx = new AudioContext({latencyHint: 'playback'});  // 余裕のあるバッファで音切れを防ぐ
-  if ($('sink').value !== (audioCtx.sinkId || '') && audioCtx.setSinkId) {
-    try { await audioCtx.setSinkId($('sink').value); } catch (e) { setStatus(`スピーカーを切り替えられませんでした: ${e}`, true); }
+  if (!audioCtx) {
+    audioCtx = new AudioContext({latencyHint: 'playback'});  // 余裕のあるバッファで音切れを防ぐ
+    const keep = audioCtx.createConstantSource();
+    keep.offset.value = 0;
+    keep.connect(audioCtx.destination);
+    keep.start();
   }
-  await audioCtx.resume();
+  if ($('sink').value !== (audioCtx.sinkId || '') && audioCtx.setSinkId) {
+    try { await audioCtx.setSinkId($('sink').value); readyAt = audioCtx.currentTime + 0.4; }
+    catch (e) { setStatus(`スピーカーを切り替えられませんでした: ${e}`, true); }
+  }
+  if (audioCtx.state !== 'running') {
+    await audioCtx.resume();
+    readyAt = audioCtx.currentTime + 0.4;
+  }
 }
+document.addEventListener('pointerdown', () => { ensureAudio(); }, {once: true});
 async function playWav(buf) {
   await ensureAudio();
   const audio = await audioCtx.decodeAudioData(buf);
@@ -115,7 +129,7 @@ async function playWav(buf) {
   src.buffer = audio;
   src.connect(audioCtx.destination);
   // 前の文の終わりにぴったり続ける（間に合わなかったときは少し先から鳴らす）
-  const start = Math.max(audioCtx.currentTime + 0.05, playHead);
+  const start = Math.max(audioCtx.currentTime + 0.05, playHead, readyAt);
   src.start(start);
   playHead = start + audio.duration;
   sources.push(src);

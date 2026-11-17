@@ -51,24 +51,42 @@ def list_output_devices() -> list[tuple[int | None, str]]:
 
 
 class Player:
-    """合成できた音声を、1 本の出力ストリームで切れ目なく順に再生する。
+    """合成できた音声を、開いたままの 1 本の出力ストリームで切れ目なく順に再生する。
 
-    文ごとに sd.play で開き直すと、開くたびの待ちや、合成で CPU が忙しいときの音切れが起きるので、
-    ストリームは開いたままにし、余裕のあるバッファ（latency="high"）で流す。
+    - 再生のたびにストリームを開くと、デバイスが動き出すまで（Bluetooth などでは数百 ms）に
+      1 文目の頭が消えるので、アプリの起動時から 48 kHz で開いたままにし、黙っている間は無音を流す
+    - エンジンごとにサンプリング周波数が違うので、48 kHz に変換してから流す
+    - 合成で CPU が忙しくても音が切れないよう、余裕のあるバッファ（latency="high"）で流す
     """
+
+    RATE = 48000
 
     def __init__(self) -> None:
         self.device: int | None = None
-        self.rate = 0
         self.stream = None
         self.buf: deque = deque()
         self.offset = 0
         self.lock = threading.Lock()
+        self.error = ""
+        self._open()
+
+    def _open(self) -> None:
+        import sounddevice as sd
+
+        self._close()
+        try:
+            self.stream = sd.OutputStream(samplerate=self.RATE, channels=1, dtype="float32", device=self.device,
+                                          latency="high", callback=self._callback)
+            self.stream.start()
+            self.error = ""
+        except Exception as ex:  # noqa: BLE001
+            self.stream, self.error = None, f"スピーカーを開けませんでした: {ex}"
 
     def set_device(self, device: int | None) -> None:
         if device != self.device:
             self.device = device
-            self._close()
+            self.stop()
+            self._open()
 
     def _close(self) -> None:
         if self.stream is not None:
@@ -77,7 +95,7 @@ class Player:
                 self.stream.close()
             except Exception:  # noqa: BLE001
                 pass
-        self.stream, self.rate = None, 0
+        self.stream = None
 
     def _callback(self, outdata, frames, _time, _status) -> None:
         out = outdata[:, 0]
@@ -94,19 +112,21 @@ class Player:
                     self.offset = 0
         out[filled:] = 0.0
 
-    def play(self, audio: np.ndarray, rate: int) -> None:
-        import sounddevice as sd
+    @classmethod
+    def _resample(cls, audio: np.ndarray, rate: int) -> np.ndarray:
+        if rate == cls.RATE or len(audio) == 0:
+            return audio
+        from math import gcd
 
-        audio = np.asarray(audio, dtype=np.float32).reshape(-1)
-        if self.stream is None or rate != self.rate:
-            if self.stream is not None and rate != self.rate:
-                # 途中でサンプリング周波数が変わる（エンジンを替えた）ときは、鳴っている分を捨てて開き直す
-                self.stop()
-            self._close()
-            self.stream = sd.OutputStream(samplerate=rate, channels=1, dtype="float32", device=self.device,
-                                          latency="high", callback=self._callback)
-            self.stream.start()
-            self.rate = rate
+        from scipy.signal import resample_poly
+
+        g = gcd(int(rate), cls.RATE)
+        return resample_poly(audio, cls.RATE // g, int(rate) // g).astype(np.float32)
+
+    def play(self, audio: np.ndarray, rate: int) -> None:
+        if self.stream is None:
+            self._open()
+        audio = self._resample(np.asarray(audio, dtype=np.float32).reshape(-1), int(rate))
         with self.lock:
             self.buf.append(audio)
 
@@ -200,7 +220,7 @@ class MainWindow(QMainWindow):
         self.out_combo = QComboBox()
         for idx, label in list_output_devices():
             self.out_combo.addItem(label, idx)
-        self.out_combo.currentIndexChanged.connect(lambda _i: self.player.set_device(self.out_combo.currentData()))
+        self.out_combo.currentIndexChanged.connect(self._set_output)
         g2.addWidget(self.out_combo, 1, 1)
         g2.addWidget(QLabel("例文"), 1, 2)
         sample_combo = QComboBox()
@@ -229,7 +249,7 @@ class MainWindow(QMainWindow):
         ctrl.addWidget(self.speak_btn)
         ctrl.addWidget(self.halt_btn)
         ctrl.addWidget(self.save_btn)
-        self.status = QLabel("")
+        self.status = QLabel(self.player.error)
         self.status.setWordWrap(True)
         self.status.setStyleSheet("color:#777")
         ctrl.addWidget(self.status, 1)
@@ -251,6 +271,10 @@ class MainWindow(QMainWindow):
             self.player.play(audio, rate)
             return
         self.bridge.event.emit(e)
+
+    def _set_output(self, _index: int) -> None:
+        self.player.set_device(self.out_combo.currentData())
+        self.status.setText(self.player.error)
 
     def _engine(self) -> dict:
         return self.engines[self.engine_combo.currentIndex()]
