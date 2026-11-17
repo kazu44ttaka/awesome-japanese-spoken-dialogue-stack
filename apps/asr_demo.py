@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
         for m in self.models:
             self.model_combo.addItem(m["label"], m["name"])
         self.model_combo.setCurrentIndex(next(i for i, m in enumerate(self.models) if m["name"] == DEFAULT_MODEL))
-        self.model_combo.currentIndexChanged.connect(self._sync_device)
+        self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         grid.addWidget(self.model_combo, 0, 1, 1, 3)
         grid.addWidget(QLabel("Device"), 1, 0)
         self.device_combo = QComboBox()
@@ -192,8 +192,16 @@ class MainWindow(QMainWindow):
         self.device_combo.setEnabled(gpu)
         self.device_combo.setToolTip("" if gpu else "このモデルは CPU で動かす")
 
+    def _on_model_changed(self, _index: int) -> None:
+        """MaAI-SDS と同じく、ASRエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で読み込む）。"""
+        self._sync_device()
+        if self.session.state in ("running", "error"):
+            self._stop()
+            self.session.stop_model()
+
     def _sync_buttons(self) -> None:
         s = self.session
+        self.model_combo.setEnabled(s.state != "starting")  # 読み込みの途中では切り替えない
         self.start_model_btn.setEnabled(s.state != "starting")
         self.stop_model_btn.setEnabled(s.state in ("running", "error"))
         self.listen_btn.setEnabled(s.ready and not s.listening)

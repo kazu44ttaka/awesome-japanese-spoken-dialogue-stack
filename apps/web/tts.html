@@ -75,6 +75,7 @@ function setState(s, detail) {
   syncButtons();
 }
 function syncButtons() {
+  $('engine').disabled = state === 'starting';  // 起動の途中では切り替えない
   $('start').disabled = state === 'starting';
   $('stopEngine').disabled = !(state === 'running' || state === 'error');
   $('speak').disabled = state !== 'running' || speaking;
@@ -199,7 +200,15 @@ async function listSinks() {
   } catch (e) { /* 一覧を取れないブラウザは既定だけ */ }
 }
 
-$('engine').onchange = syncEngine;
+// MaAI-SDS と同じく、TTSエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で起動する）
+$('engine').onchange = () => {
+  if (state === 'running' || state === 'error') {
+    stopPlayback();
+    setVoices([]);
+    ws.send(JSON.stringify({type: 'stop_engine'}));
+  }
+  syncEngine();
+};
 $('start').onclick = () => ws.send(JSON.stringify({type: 'start', name: engine().name, device: $('device').value}));
 $('stopEngine').onclick = () => { stopPlayback(); ws.send(JSON.stringify({type: 'stop_engine'})); };
 $('speak').onclick = async () => {

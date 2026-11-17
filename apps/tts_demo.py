@@ -174,7 +174,7 @@ class MainWindow(QMainWindow):
         for e in self.engines:
             self.engine_combo.addItem(e["label"], e["name"])
         self.engine_combo.setCurrentIndex(next(i for i, e in enumerate(self.engines) if e["name"] == DEFAULT_ENGINE))
-        self.engine_combo.currentIndexChanged.connect(self._sync_engine)
+        self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         grid.addWidget(self.engine_combo, 0, 1, 1, 3)
         self.device_label = QLabel("Device")
         grid.addWidget(self.device_label, 1, 0)
@@ -292,12 +292,21 @@ class MainWindow(QMainWindow):
             self.device_combo.addItem(e["fixed_device"])
             self.device_combo.setEnabled(False)
             self.device_combo.setToolTip("このエンジンはデバイスを選べない")
-        if self.session.state in ("stopped", "error") or self.session.engine_name != e["name"]:
+        if self.session.state in ("stopped", "error"):
             self.state_detail.setText(e["note"])
         self._sync_buttons()
 
+    def _on_engine_changed(self, _index: int) -> None:
+        """MaAI-SDS と同じく、TTSエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で起動する）。"""
+        if self.session.state in ("running", "error"):
+            self._halt()
+            self.voice_combo.clear()
+            self.session.stop_engine()
+        self._sync_engine()
+
     def _sync_buttons(self) -> None:
         s = self.session
+        self.engine_combo.setEnabled(s.state != "starting")  # 起動の途中では切り替えない
         self.start_btn.setEnabled(s.state != "starting")
         self.stop_btn.setEnabled(s.state in ("running", "error"))
         self.speak_btn.setEnabled(s.ready and not s.speaking)

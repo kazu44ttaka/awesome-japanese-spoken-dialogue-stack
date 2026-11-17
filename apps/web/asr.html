@@ -123,6 +123,7 @@ function setListenStatus(text, error = false) {
   $('listenStatus').classList.toggle('error', error);
 }
 function syncButtons() {
+  $('model').disabled = state === 'starting';  // 読み込みの途中では切り替えない
   $('startModel').disabled = state === 'starting';
   $('stopModel').disabled = !(state === 'running' || state === 'error');
   $('listen').disabled = state !== 'running' || listening;
@@ -232,7 +233,14 @@ function stopListening(send = true) {
   syncButtons();
 }
 
-$('model').onchange = syncDevice;
+// MaAI-SDS と同じく、ASRエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で読み込む）
+$('model').onchange = () => {
+  syncDevice();
+  if (state === 'running' || state === 'error') {
+    if (listening) stopListening();
+    ws.send(JSON.stringify({type: 'stop_model'}));
+  }
+};
 $('startModel').onclick = () => {
   if (listening) stopListening();
   ws.send(JSON.stringify({type: 'start_model', name: models[$('model').selectedIndex].name, device: $('device').value}));
