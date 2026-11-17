@@ -327,7 +327,8 @@ class Irodori:
         if device.startswith("cuda"):
             torch.set_float32_matmul_precision("high")
         self.SamplingRequest = SamplingRequest
-        self.steps = int(cfg.get("steps", 40))
+        self.steps = int(cfg.get("steps", 40))  # 公式の既定（MeanFlow でないチェックポイント）
+        self.schedule = str(cfg.get("t_schedule_mode", "linear"))  # 公式の高速化の例は steps=6 と sway
         self.captions = list(cfg.get("captions", ["明るく自然な日本語の声"]))
         self.runtime = InferenceRuntime.from_key(RuntimeKey(
             checkpoint=download_hf_checkpoint(str(cfg.get("checkpoint", "Aratako/Irodori-TTS-v4.1-Small"))),
@@ -344,7 +345,8 @@ class Irodori:
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
         req = self.SamplingRequest(text=text, caption=voice, num_steps=self.steps, cfg_scale_text=3.0,
-                                   cfg_scale_caption=3.0, cfg_scale_speaker=5.0, seed=42, no_ref=True)
+                                   cfg_scale_caption=3.0, cfg_scale_speaker=5.0, seed=42, no_ref=True,
+                                   t_schedule_mode=self.schedule)
         result = self.runtime.synthesize(req, log_fn=None)
         return result.audio.detach().float().cpu().numpy().reshape(-1), int(result.sample_rate)
 
@@ -355,7 +357,9 @@ class Supertonic:
     def __init__(self, cfg: dict | None = None) -> None:
         from supertonic import TTS
 
-        self.tts = TTS(model="supertonic-3", auto_download=True)
+        threads = (cfg or {}).get("threads")  # 省くと ONNX Runtime の既定（全コア。E コアも含む）
+        kwargs = {"intra_op_num_threads": int(threads)} if threads else {}
+        self.tts = TTS(model="supertonic-3", auto_download=True, **kwargs)
         self._styles: dict[str, object] = {}
 
     def available(self) -> bool:
@@ -578,6 +582,7 @@ class MossNano:
         sys.path.insert(0, str(_path(cfg.get("root", "models/src/MOSS-TTS-Nano"))))
         from moss_tts_nano_runtime import NanoTTSService
 
+        self.seed = int(cfg.get("seed", 42))  # サンプリングするので、測り直しても同じ結果になるよう固定する
         self.service = NanoTTSService(device=str(cfg.get("device", "cpu")),
                                       output_dir=Path(tempfile.gettempdir()) / "moss-tts-nano")
 
@@ -591,7 +596,7 @@ class MossNano:
         return found or [("Yui", "Yui")]
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
-        result = self.service.synthesize(text=text, voice=voice or "Yui")
+        result = self.service.synthesize(text=text, voice=voice or "Yui", seed=self.seed)
         return np.asarray(result["waveform_numpy"], dtype=np.float32).reshape(-1), int(result["sample_rate"])
 
 

@@ -81,7 +81,9 @@ class GraniteCTC:
 
         self.torch = torch
         self.processor = AutoProcessor.from_pretrained(model_id)
-        self.model = AutoModelForCTC.from_pretrained(model_id).to(device).eval()
+        # transformers 5 は既定で設定どおりの型（このモデルは bfloat16）で読む。CPU の bfloat16 は遅いので float32 にする
+        dtype = torch.bfloat16 if device.startswith("cuda") else torch.float32
+        self.model = AutoModelForCTC.from_pretrained(model_id, dtype=dtype).to(device).eval()
         self.device = device
 
     def __call__(self, audio: np.ndarray) -> str:
@@ -242,8 +244,12 @@ class WhisperHF:
         self.pipe = pipeline("automatic-speech-recognition", model=model_id, dtype=dtype, device=device)
 
     def __call__(self, audio: np.ndarray) -> str:
+        # 繰り返しの暴走を止める: 圧縮率（トークン空間、transformers の推奨 1.35）や平均の対数確率が悪い出力は、
+        # 温度を上げて出し直す（OpenAI の Whisper や faster-whisper の既定と同じ考え方）
         out = self.pipe({"raw": audio, "sampling_rate": 16000},
-                        generate_kwargs={"language": "ja", "task": "transcribe"})
+                        generate_kwargs={"language": "ja", "task": "transcribe",
+                                         "temperature": (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+                                         "compression_ratio_threshold": 1.35, "logprob_threshold": -1.0})
         return str(out.get("text", ""))
 
 
@@ -282,7 +288,11 @@ def sherpa_has_cuda() -> bool:
 
 
 class Sherpa:
-    """sherpa-onnx のオフライン認識（k2-fsa の配布物の int8）。CUDA 版の sherpa-onnx なら GPU でも動く。"""
+    """sherpa-onnx のオフライン認識（k2-fsa の配布物）。CUDA 版の sherpa-onnx なら GPU でも動く。
+
+    CPU では int8 を使う。int8 は一部の演算（MatMulInteger など）が CUDA に載らず CPU に戻って遅くなるので、
+    GPU では fp32 の配布があるもの（sensevoice・reazonspeech-k2・funasr-nano）は fp32 を使う。
+    """
 
     def __init__(self, kind: str, model_dir: Path | None, threads: int, provider: str = "cpu") -> None:
         import sherpa_onnx
@@ -290,30 +300,38 @@ class Sherpa:
         if provider == "cuda":
             add_cuda_dll_dirs()
         self.device = provider
-        d = Path(model_dir) if model_dir else ensure_sherpa_model(kind)
+        fp32 = provider == "cuda" and kind in ("sensevoice", "reazonspeech-k2", "funasr-nano")
+        self.precision = "fp32" if fp32 else "int8"
+        q = "" if fp32 else ".int8"
+        if model_dir:
+            d = Path(model_dir)
+        elif fp32 and kind != "reazonspeech-k2":
+            d = ensure_sherpa_model(f"{kind}-fp32")
+        else:
+            d = ensure_sherpa_model(kind)
         R = sherpa_onnx.OfflineRecognizer
         if kind == "sensevoice":
-            self.rec = R.from_sense_voice(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
+            self.rec = R.from_sense_voice(model=str(d / f"model{q}.onnx"), tokens=str(d / "tokens.txt"),
                                           num_threads=threads, provider=provider, language="ja", use_itn=True)
         elif kind == "parakeet-ctc":
             self.rec = R.from_nemo_ctc(model=str(d / "model.int8.onnx"), tokens=str(d / "tokens.txt"),
                                        num_threads=threads, provider=provider)
         elif kind == "reazonspeech-k2":
             self.rec = R.from_transducer(
-                encoder=str(d / "encoder-epoch-99-avg-1.int8.onnx"), decoder=str(d / "decoder-epoch-99-avg-1.onnx"),
-                joiner=str(d / "joiner-epoch-99-avg-1.int8.onnx"), tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider)
+                encoder=str(d / f"encoder-epoch-99-avg-1{q}.onnx"), decoder=str(d / "decoder-epoch-99-avg-1.onnx"),
+                joiner=str(d / f"joiner-epoch-99-avg-1{q}.onnx"), tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider)
         elif kind == "cohere":
             self.rec = R.from_cohere_transcribe(encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"),
                                                 tokens=str(d / "tokens.txt"), num_threads=threads, provider=provider, language="ja",
                                                 use_punct=True, use_itn=True)
         elif kind == "qwen3-asr":
-            # int8 は CUDA に載せても MatMulInteger が CPU に落ちるので、CPU のまま使う
+            # fp32 の配布が無い。言語を指定する引数も無い（日本語以外で出ることがある）
             self.rec = R.from_qwen3_asr(conv_frontend=str(d / "conv_frontend.onnx"), encoder=str(d / "encoder.int8.onnx"),
                                         decoder=str(d / "decoder.int8.onnx"), tokenizer=str(d / "tokenizer"),
                                         num_threads=threads, provider=provider, sample_rate=16000, feature_dim=128)
         elif kind == "funasr-nano":
-            self.rec = R.from_funasr_nano(encoder_adaptor=str(d / "encoder_adaptor.int8.onnx"), llm=str(d / "llm.int8.onnx"),
-                                          embedding=str(d / "embedding.int8.onnx"), tokenizer=str(d / "Qwen3-0.6B"),
+            self.rec = R.from_funasr_nano(encoder_adaptor=str(d / f"encoder_adaptor{q}.onnx"), llm=str(d / ("llm.fp32.onnx" if fp32 else "llm.int8.onnx")),
+                                          embedding=str(d / f"embedding{q}.onnx"), tokenizer=str(d / "Qwen3-0.6B"),
                                           num_threads=threads, provider=provider, language="ja", itn=True, max_new_tokens=128)
         else:
             raise ValueError(kind)
@@ -501,7 +519,7 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "granite-4.0-1b": lambda: Granite4Speech("ibm-granite/granite-4.0-1b-speech", device),
         "voxtral-realtime": lambda: VoxtralRealtime("mistralai/Voxtral-Mini-4B-Realtime-2602", device),
         "haas-ja": lambda: HaasASR("third-intelligence/Haas-ja-v1.0"),
-        "parakeet-ctc-1.1b-ja": lambda: NemoASR("grider-transwithai/parakeet-ctc-1.1b-ja", "parakeet-ja-gal.nemo", device),
+        "parakeet-ctc-1.1b-ja": lambda: NemoASR("grider-transwithai/parakeet-ctc-1.1b-ja", "parakeet-ja.nemo", device),
         "fun-asr-mlt-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-MLT-Nano-2512", device),
         "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", device),
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),

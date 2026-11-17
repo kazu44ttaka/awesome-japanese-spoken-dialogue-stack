@@ -224,6 +224,7 @@ def main() -> None:
         "dataset": args.dataset or str(args.manifest),
         "device": getattr(recognize, "device", args.device),  # sherpa-onnx は CPU 版なら cuda を頼んでも CPU になる
         "threads": args.threads if getattr(recognize, "device", args.device) == "cpu" else None,
+        "precision": getattr(recognize, "precision", None),  # sherpa-onnx の int8 / fp32
         "load_s": round(load_s, 1),
         "batch": args.batch,
         **summarize(results),

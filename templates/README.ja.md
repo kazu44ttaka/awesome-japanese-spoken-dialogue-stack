@@ -56,7 +56,7 @@
 
 - **最小の推論例**：[examples/asr/](examples/asr/) — WAV を 1 つ渡すと書き起こすだけの、モデルごとのスクリプト（単独で動く）
 - **マイクで試すアプリ**：[apps/asr_demo.py](apps/asr_demo.py) — モデルを選び、話した声をその場で認識する。発話区間検出（Silero VAD）で区切って確定し、話している途中の経過も出せる（疑似ストリーミング）。認識にかかった時間と、話し終わりから表示までの時間を表示する。Nemotron 3.5 streaming は真のストリーミング（音声を少しずつ入れて内部状態を引き継ぐ）で動く
-- **TTS を試すアプリ**：[apps/tts_demo.py](apps/tts_demo.py) — エンジン（AivisSpeech・VOICEVOX・VOICEVOX Core・Irodori-TTS・Supertonic 3・mio-tts-cpp・Qwen3-TTS・Tsukasa・Kokoro）と声を選んで読み上げる。「文ごとに合成して、できた文から再生」で、最初の音が出るまでの時間（音声対話で効く）を確かめられる。AivisSpeech / VOICEVOX は入っていればアプリから起動できる。入れ方は [apps/README.md](apps/README.md)
+- **TTS を試すアプリ**：[apps/tts_demo.py](apps/tts_demo.py) — エンジン（AivisSpeech・VOICEVOX・VOICEVOX Core・Irodori-TTS・Supertonic 3・mio-tts-cpp・Qwen3-TTS・Tsukasa・Kokoro・ZONOS3-Mini・Kitten TTS 2・LFM2.5-Audio・MOSS-TTS-Nano）と声を選んで読み上げる。「文ごとに合成して、できた文から再生」で、最初の音が出るまでの時間（音声対話で効く）を確かめられる。AivisSpeech / VOICEVOX は入っていればアプリから起動できる。入れ方は [apps/README.md](apps/README.md)
 
 ```
 uv venv --python 3.11 .venv
@@ -71,9 +71,11 @@ python apps/asr_demo.py
 
 | 対象 | 内容 | 結果 |
 |---|---|---|
-| ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER と 1 発話あたりの処理時間（16 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
+| ASR | 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）での読みの CER（21 構成） | [2026-11（3 つの評価データ）](benchmarks/asr/2026-11-3sets.md) |
+| ASR | 同じ 100 発話での処理時間を GPU・CPU（8 スレッド）に分けて測定 | [2026-11（処理時間）](benchmarks/asr/2026-11-timing.md) |
 | ASR | JSUT 20 発話での文字誤り率（CER）と 1 発話あたりの処理時間 | [2026-08](benchmarks/asr/2026-08-jsut20.md)、[2026-11（新しい候補・句読点なしの CER）](benchmarks/asr/2026-11-jsut20.md) |
-| TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [benchmarks/tts/2026-08-19.md](benchmarks/tts/2026-08-19.md) |
+| TTS | 短い文から長い文まで 20 文の合成時間・RTF と、3 つの ASR で書き起こした読みの CER（GPU・CPU に分けて 9 エンジン・16 構成） | [2026-11](benchmarks/tts/2026-11-tts.md) |
+| TTS | 長文の RTF（生成時間 ÷ 音声の長さ）、メモリ、ASR で書き起こして読み間違いを検査 | [2026-08](benchmarks/tts/2026-08-19.md) |
 | LLM | 音声対話での最初の文字までの時間（TTFT）と文字の出る速さ（LM Studio・10 モデル） | [2026-11](benchmarks/llm/2026-11-lmstudio.md) |
 
 測り方と測定環境は [benchmarks/README.md](benchmarks/README.md) にまとめています。

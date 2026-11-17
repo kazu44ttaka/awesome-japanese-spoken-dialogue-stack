@@ -23,9 +23,11 @@
 
 ## ページ
 
-- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 16 構成を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
+- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 21 構成を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
+- [asr/2026-11-timing.md](asr/2026-11-timing.md) — 同じ 100 発話での ASR の処理時間（GPU と CPU 8 スレッドを分けて）
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間
 - [asr/2026-11-jsut20.md](asr/2026-11-jsut20.md) — 新しい候補（Moonshine・Granite・Fun-ASR-MLT）と、句読点を除いた CER
+- [tts/2026-11-tts.md](tts/2026-11-tts.md) — TTS 9 エンジン（16 構成）の 20 文での合成時間と読みの CER（GPU・CPU を分けて）
 - [tts/2026-08-19.md](tts/2026-08-19.md) — TTS 9 候補の速度・メモリ・ASR 検査
 - [llm/2026-11-lmstudio.md](llm/2026-11-lmstudio.md) — LLM 10 モデルの最初の文字までの時間と速さ（LM Studio）
 
@@ -37,6 +39,9 @@
 
 - [asr/scripts/eval_asr.py](asr/scripts/eval_asr.py) — ASR の CER（句読点あり・なし・読み）と処理時間。`--dataset fleurs-ja` / `reazonspeech-test` / `cv8-ja` で評価データを取得する
 - [asr/scripts/make_table.py](asr/scripts/make_table.py) — 結果を採点し直して Markdown の表にする（`--summary` で評価データを横に並べる）
+- [asr/scripts/make_timing_set.py](asr/scripts/make_timing_set.py) — 処理時間を測るための 100 発話の評価セットを作る
+- [tts/scripts/bench_tts.py](tts/scripts/bench_tts.py) — TTS で 20 文を 1 文ずつ合成して時間を測る（`--set KEY=VALUE` で設定を変える）
+- [tts/scripts/score_tts.py](tts/scripts/score_tts.py) — 合成した音声を 3 つの ASR で書き起こし、読みの CER を付ける
 - [llm/scripts/bench_llm.py](llm/scripts/bench_llm.py) — LLM の最初の文字までの時間と速さ（OpenAI 互換 API）
 
 2026-08 の測定に使ったスクリプトは [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) の `benchmarks/` にあり、手元のパスを取り除いてからここへ移す予定です。
