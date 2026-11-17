@@ -119,3 +119,35 @@ export SPEECH_MODEL_DIR=D:/awesome-japanese-speech/models/speechcpp
 声をクローンする TTS は、Common Voice 8.0（CC0）の 1 発話 `data/voices/ref_ja.wav`（16 kHz・5.5 秒）と、その書き起こし
 `data/voices/ref_ja.txt` を参照音声に使う。Qwen3-TTS の Base は 16 kHz の参照音声を受け付けないので、24 kHz にした
 `ref_ja_24k.wav` を使う。
+
+## 比べるための元の実装（PyTorch）
+
+ggml の実行系の値が、移植で変わっていないかを見るために、同じモデルを公式の実装でも測る。依存がぶつかるので、
+モデルごとに専用の環境を作る（PyTorch は RTX 50 系が動く CUDA 12.8 版）。
+
+```bash
+T="torch==2.11.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu128"
+# Qwen3-TTS（qwen-tts は transformers 4.57.3 に固定）
+uv venv .venv-qwen-tts --python 3.11 && uv pip install --python .venv-qwen-tts/Scripts/python.exe $T
+uv pip install --python .venv-qwen-tts/Scripts/python.exe qwen-tts==0.1.1
+# OmniVoice（transformers 5.3 以降）
+uv venv .venv-omnivoice --python 3.11 && uv pip install --python .venv-omnivoice/Scripts/python.exe $T
+uv pip install --python .venv-omnivoice/Scripts/python.exe omnivoice==0.2.1
+# CosyVoice3（公式リポジトリ。requirements.txt は古い PyTorch に固定なので、推論に要るものだけ入れる）
+git clone --recursive https://github.com/FunAudioLLM/CosyVoice models/src/CosyVoice
+uv venv .venv-cosyvoice --python 3.11 && uv pip install --python .venv-cosyvoice/Scripts/python.exe $T
+uv pip install --python .venv-cosyvoice/Scripts/python.exe conformer==0.3.2 diffusers==0.29.0 hydra-core==1.3.2 \
+    HyperPyYAML==1.2.3 inflect==7.3.1 librosa lightning omegaconf==2.3.0 onnxruntime openai-whisper \
+    x-transformers==2.11.24 wetext==0.0.4 transformers==4.51.3 numpy==1.26.4 pyarrow==18.1.0 pyworld wget \
+    soundfile matplotlib huggingface_hub rich gdown
+```
+
+- 構成の名前は `qwen3-tts-0.6b-base` などで、`apps/tts_engines.toml` の節の `python` にその環境を書く
+  （`apps/tts_engines.example.toml`）。モデルは `models/hf` に取ってくる
+- CosyVoice3 は、公式の例のとおり日本語をカタカナで渡す（設定の `kana = true`。pyopenjtalk のある親の環境で直してから渡す）。
+  漢字のまま渡すと読みが崩れる（CrispASR 版で読みの CER 0.44、カタカナで 0.016）
+- Windows の torchaudio 2.9 以降の `load` は torchcodec（FFmpeg の DLL）を使うので、soundfile で読むように差し替えている
+- ASR の ReazonSpeech NeMo v2 と Parakeet TDT-CTC 0.6B ja は、Haas-ja と同じ `.venv-haas`（NeMo）で動く
+
+測定の結果には、読み込み時間（`load_s`）と、GPU のメモリ（読み込む前からの増え方の最大、`gpu_mem_mb`）、RAM
+（測定の処理とサーバーなどの子プロセスの合計の最大、`ram_mb`）も入る（`runtimes/memwatch.py`）。

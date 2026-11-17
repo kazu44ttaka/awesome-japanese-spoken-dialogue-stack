@@ -67,6 +67,8 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("moonshine-base-ja", "Moonshine base-ja（transformers）", "transformers", True),
     BackendInfo("haas-ja", "Haas-ja-v1.0（haas-asr・GPU・専用の環境）", "haas-asr", True),
     BackendInfo("parakeet-ctc-1.1b-ja", "Parakeet CTC 1.1B 日本語（NeMo・専用の環境）", "nemo", True),
+    BackendInfo("reazonspeech-nemo-v2", "ReazonSpeech NeMo v2（NeMo・専用の環境）", "nemo", True),
+    BackendInfo("parakeet-tdt-ctc-0.6b-ja", "Parakeet TDT-CTC 0.6B 日本語（NeMo・専用の環境）", "nemo", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
     BackendInfo("kotoba-whisper-v2.0", "Kotoba-Whisper v2.0（transformers）", "transformers", True),
     BackendInfo("fun-asr-nano", "Fun-ASR-Nano-2512（funasr）", "funasr", True),
@@ -210,6 +212,8 @@ class VenvASR:
 _VENV_MODELS = {
     "haas-ja": ("haas_asr", REPO / ".venv-haas" / "Scripts" / "python.exe"),
     "parakeet-ctc-1.1b-ja": ("nemo", REPO / ".venv-haas" / "Scripts" / "python.exe"),
+    "reazonspeech-nemo-v2": ("nemo", REPO / ".venv-haas" / "Scripts" / "python.exe"),
+    "parakeet-tdt-ctc-0.6b-ja": ("nemo", REPO / ".venv-haas" / "Scripts" / "python.exe"),
 }
 
 
@@ -629,6 +633,9 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "voxtral-realtime": lambda: VoxtralRealtime("mistralai/Voxtral-Mini-4B-Realtime-2602", device),
         "haas-ja": lambda: HaasASR("third-intelligence/Haas-ja-v1.0"),
         "parakeet-ctc-1.1b-ja": lambda: NemoASR("grider-transwithai/parakeet-ctc-1.1b-ja", "parakeet-ja.nemo", device),
+        # ggml の実行系（speech.cpp・CrispASR）と比べるための元の実装（NeMo）
+        "reazonspeech-nemo-v2": lambda: NemoASR("reazon-research/reazonspeech-nemo-v2", "reazonspeech-nemo-v2.nemo", device),
+        "parakeet-tdt-ctc-0.6b-ja": lambda: NemoASR("nvidia/parakeet-tdt_ctc-0.6b-ja", "parakeet-tdt_ctc-0.6b-ja.nemo", device),
         "fun-asr-mlt-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-MLT-Nano-2512", device),
         "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", device),
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),

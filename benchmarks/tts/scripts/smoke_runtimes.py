@@ -29,7 +29,7 @@ for name in names:
     t0 = time.time()
     tts = None
     try:
-        tts = create(name, {})
+        tts = create(name)  # apps/tts_engines.toml の設定（別の環境の python など）を使う
         rec["start_s"] = round(time.time() - t0, 1)
         voice = tts.voices()[0][0]
         res = []

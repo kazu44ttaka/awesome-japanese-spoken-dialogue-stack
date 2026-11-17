@@ -39,6 +39,9 @@ def main() -> None:
     out_dir = REPO / "data" / "tts_out" / name
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    from runtimes.memwatch import MemWatch
+
+    watch = MemWatch().start()  # GPU のメモリは読み込む前を基準にした増え方の最大、RAM は子プロセスも含めた最大
     t0 = time.perf_counter()
     config = load_config()
     for item in args.set:
@@ -64,13 +67,14 @@ def main() -> None:
         rows.append({"i": i, "text": text, "synth_s": round(sec, 3), "audio_s": round(dur, 3),
                      "rtf": round(sec / dur, 3) if dur else None, "wav": str(wav.relative_to(REPO)).replace("\\", "/")})
         print(f"{i:02d} {sec * 1000:.0f} ms / {dur:.2f} s | {text}", flush=True)
+    mem = watch.stop()
     if hasattr(engine, "close"):
         engine.close()
 
     synth = sorted(r["synth_s"] for r in rows)
     total_audio = sum(r["audio_s"] for r in rows)
     summary = {
-        "engine": args.engine, "name": name, "voice": voice, "settings": args.set, "load_s": round(load_s, 1), "count": len(rows),
+        "engine": args.engine, "name": name, "voice": voice, "settings": args.set, "load_s": round(load_s, 1), **mem, "count": len(rows),
         "mean_synth_ms": round(1000 * sum(synth) / len(synth), 1),
         "p95_synth_ms": round(1000 * synth[min(len(synth) - 1, int(0.95 * len(synth)))], 1),
         "short_synth_ms": round(1000 * sum(r["synth_s"] for r in rows if len(r["text"]) <= 12) /

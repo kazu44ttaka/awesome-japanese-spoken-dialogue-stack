@@ -191,6 +191,9 @@ def main() -> None:
             torch.set_num_threads(args.threads)
         except ImportError:
             pass
+    from runtimes.memwatch import MemWatch
+
+    watch = MemWatch().start()  # GPU のメモリは読み込む前を基準にした増え方の最大、RAM は子プロセスも含めた最大
     t_load = time.perf_counter()
     recognize = make_backend(args.backend, args)
     load_s = time.perf_counter() - t_load
@@ -220,6 +223,7 @@ def main() -> None:
         results.append(item)
         print(f"{item['utt']} CER={item['cer']:.3f} kana={item['cer_kana']:.3f} {ms:.0f} ms | {hyp}", flush=True)
 
+    mem = watch.stop()
     ms_sorted = sorted(r["ms"] for r in results)
     summary = {
         "backend": args.backend,
@@ -228,6 +232,7 @@ def main() -> None:
         "threads": args.threads if getattr(recognize, "device", args.device) == "cpu" else None,
         "precision": getattr(recognize, "precision", None),  # sherpa-onnx の int8 / fp32
         "load_s": round(load_s, 1),
+        **mem,
         "batch": args.batch,
         **summarize(results),
         "mean_ms": round(sum(ms_sorted) / len(ms_sorted), 1),

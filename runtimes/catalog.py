@@ -69,7 +69,8 @@ ASR: dict[str, dict[str, dict]] = {
     },
 }
 
-# TTS: voices は既定の声の名前（先頭を使う）。clone は参照音声 data/voices/ref_ja.wav で声をクローンする
+# TTS: voices は既定の声の名前（先頭を使う）。clone は参照音声 data/voices/ref_ja.wav で声をクローンする。
+# kana は文をカタカナの読みに直してから渡す（pyopenjtalk）
 TTS: dict[str, dict[str, dict]] = {
     "crispasr": {
         "qwen3-tts-0.6b-base": {"backend": "qwen3-tts", "clone": True, "ref_24k": True},
@@ -84,8 +85,9 @@ TTS: dict[str, dict[str, dict]] = {
         "omnivoice": {"backend": "omnivoice", "args": ["--accept-license", "omnivoice-terms",  # 同意済み（2026-11-17）
                                                        "--codec-model", "models/crispasr/omnivoice-tokenizer-q8_0.gguf"]},  # 同意済み（2026-11-17）
         "supertonic-3": {"backend": "supertonic", "voices": ["F1"], "quant": None, "args": ["--accept-license", "openrail-m"]},  # 同意済み（2026-11-17）
-        # 日本語の読みが崩れる（読みの CER 約 0.4）。LLM を F16 にしても、参照音声・言語の指定・温度を変えても同じ
-        "cosyvoice3": {"backend": "cosyvoice3-tts", "clone": True, "quant": None},
+        # 公式の例のとおり、日本語は文も参照音声の書き起こしもカタカナで渡す（kana）。漢字のまま渡すと
+        # 中国語に近い読みが混ざって崩れる（読みの CER 0.44 → カタカナで 0.016）
+        "cosyvoice3": {"backend": "cosyvoice3-tts", "clone": True, "quant": None, "kana": True},
         "confucius4-tts": {"backend": "confucius4-tts", "clone": True, "ref_text": False},
         "irodori-tts-500m-v3": {"backend": "irodori-tts", "quant": None},
         "irodori-tts-600m-v3-voicedesign": {"backend": "irodori-tts", "url": "https://huggingface.co/cstr/irodori-tts-voicedesign-GGUF/resolve/main/irodori-tts-600m-v3-voicedesign-q4_k.gguf"},

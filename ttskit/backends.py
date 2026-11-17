@@ -444,7 +444,11 @@ class Supertonic:
 
 
 class Qwen3TTS:
-    """Qwen3-TTS 0.6B CustomVoice（PyTorch。日本語の声は Ono_Anna）。"""
+    """Qwen3-TTS（qwen-tts・PyTorch）。
+
+    CustomVoice は日本語の声 Ono_Anna、Base は参照音声（data/voices/ref_ja_24k.wav）で声をクローンする。
+    ggml の実行系（CrispASR・speech.cpp・audio.cpp）と同じモデル・同じ声で比べるための元の実装。
+    """
 
     MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 
@@ -452,23 +456,107 @@ class Qwen3TTS:
         import torch
         from qwen_tts import Qwen3TTSModel
 
+        cfg = cfg or {}
+        self.repo = str(cfg.get("model", self.MODEL))
+        self.clone = "-Base" in self.repo
         self.model = Qwen3TTSModel.from_pretrained(
-            self.MODEL, device_map="cuda:0" if torch.cuda.is_available() else "cpu",
+            self.repo, device_map="cuda:0" if torch.cuda.is_available() else "cpu",
             dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         )
+        self.prompt = None
+        if self.clone:
+            voices = REPO / "data" / "voices"
+            self.prompt = self.model.create_voice_clone_prompt(
+                ref_audio=str(voices / "ref_ja_24k.wav"),
+                ref_text=(voices / "ref_ja.txt").read_text(encoding="utf-8").strip())
 
     def available(self) -> bool:
         return True
 
     def voices(self) -> list[tuple[str, str]]:
-        return [("Ono_Anna", "Ono_Anna（日本語）")]
+        return [("", "参照音声（クローン）")] if self.clone else [("Ono_Anna", "Ono_Anna（日本語）")]
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
-        wavs, rate = self.model.generate_custom_voice(
-            text=text, language="Japanese", speaker=voice, instruct="",
-            max_new_tokens=min(1024, max(256, len(text) * 6 + 120)), do_sample=True, temperature=0.9,
-        )
+        limit = min(1024, max(256, len(text) * 6 + 120))
+        if self.clone:
+            wavs, rate = self.model.generate_voice_clone(text=text, language="Japanese",
+                                                         voice_clone_prompt=self.prompt, max_new_tokens=limit)
+        else:
+            wavs, rate = self.model.generate_custom_voice(
+                text=text, language="Japanese", speaker=voice or "Ono_Anna", instruct="",
+                max_new_tokens=limit, do_sample=True, temperature=0.9,
+            )
         return np.asarray(wavs[0], dtype=np.float32), int(rate)
+
+
+class OmniVoiceTTS:
+    """OmniVoice（k2-fsa の omnivoice・PyTorch・FP16）。参照音声も声の説明も付けない（実行系の測定と同じ）。"""
+
+    def __init__(self, cfg: dict | None = None) -> None:
+        import torch
+        from omnivoice import OmniVoice
+
+        cuda = torch.cuda.is_available()
+        self.model = OmniVoice.from_pretrained(str((cfg or {}).get("model", "k2-fsa/OmniVoice")),
+                                               device_map="cuda:0" if cuda else "cpu",
+                                               dtype=torch.float16 if cuda else torch.float32)
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [("", "既定の声")]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        audio = self.model.generate(text=text, language="ja")
+        return np.asarray(audio[0], dtype=np.float32).reshape(-1), 24000
+
+
+class CosyVoice3:
+    """Fun-CosyVoice3-0.5B（公式の CosyVoice・PyTorch）。参照音声 data/voices/ref_ja.wav で声をクローンする。
+
+    公式の例のとおり、日本語は文も参照音声の書き起こしもカタカナで渡す（設定の kana = true で、親の VenvEngine が
+    pyopenjtalk で直してから渡す。書き起こしは設定の ref_text に入る）。
+    """
+
+    def __init__(self, cfg: dict | None = None) -> None:
+        import sys
+
+        from huggingface_hub import snapshot_download
+
+        cfg = cfg or {}
+        root = _path(cfg.get("root", "models/src/CosyVoice"))
+        for sub in (root, root / "third_party" / "Matcha-TTS"):
+            if str(sub) not in sys.path:
+                sys.path.insert(0, str(sub))
+        # Windows の torchaudio 2.9 以降の load は FFmpeg の DLL を要る torchcodec を使うので、soundfile で読む
+        import soundfile as sf
+        import torch
+        import torchaudio
+
+        def _load(path, *args, **kwargs):
+            x, rate = sf.read(str(path), dtype="float32", always_2d=True)
+            return torch.from_numpy(x.T.copy()), rate
+
+        torchaudio.load = _load
+        from cosyvoice.cli.cosyvoice import AutoModel
+
+        self.model = AutoModel(model_dir=snapshot_download(str(cfg.get("model", "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"))))
+        voices = REPO / "data" / "voices"
+        self.ref_wav = str(voices / "ref_ja.wav")
+        ref_text = str(cfg.get("ref_text") or (voices / "ref_ja.txt").read_text(encoding="utf-8").strip())
+        self.prompt = "You are a helpful assistant.<|endofprompt|>" + ref_text
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [("", "参照音声（クローン）")]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        parts = [j["tts_speech"] for j in self.model.inference_zero_shot(text, self.prompt, self.ref_wav, stream=False)]
+        audio = np.concatenate([p.cpu().numpy().reshape(-1) for p in parts]) if parts else np.zeros(0)
+        return audio.astype(np.float32), int(self.model.sample_rate)
 
 
 class Tsukasa:
@@ -671,8 +759,15 @@ class VenvEngine:
     """エンジンを別の Python 環境の子プロセス（ttskit.worker）で動かす。設定の python にその環境の python を書く。"""
 
     def __init__(self, name: str, cfg: dict) -> None:
-        self.name, self.cfg = name, cfg
+        self.name, self.cfg = name, dict(cfg)
         self.process: subprocess.Popen | None = None
+        # kana = true の設定は、文（と参照音声の書き起こし）をこちらでカタカナの読みにしてから子に渡す
+        # （子の環境に pyopenjtalk が無くてもよいように）
+        self.kana = bool(self.cfg.get("kana"))
+        if self.kana:
+            from runtimes.servers import _ref_text
+
+            self.cfg["ref_text"] = _ref_text(kana=True)
         self.lock = threading.Lock()
 
     def _start(self) -> None:
@@ -715,6 +810,10 @@ class VenvEngine:
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
         import base64
 
+        if self.kana:
+            from runtimes.servers import to_kana
+
+            text = to_kana(text)
         res = self._call({"cmd": "synth", "text": text, "voice": voice, "speed": speed})
         return np.frombuffer(base64.b64decode(res["audio"]), dtype=np.float32).copy(), int(res["rate"])
 
@@ -736,7 +835,11 @@ def _program_files(*parts: str) -> list[Path]:
 _LOCAL = {"voicevox_core": "VoicevoxCore", "irodori": "Irodori", "supertonic": "Supertonic", "mio": "Mio",
           "supertonic_cpp": "SupertonicCpp",
           "qwen3_tts_cpp": "Qwen3TTSCpp", "qwen3-tts": "Qwen3TTS", "tsukasa": "Tsukasa", "kokoro": "Kokoro",
-          "zonos3": "Zonos3", "kitten": "Kitten", "lfm_audio": "LfmAudio", "moss_nano": "MossNano"}
+          "zonos3": "Zonos3", "kitten": "Kitten", "lfm_audio": "LfmAudio", "moss_nano": "MossNano",
+          # ggml の実行系と比べるための元の実装（PyTorch）。モデルは設定の model で選ぶ
+          "qwen3-tts-0.6b-base": "Qwen3TTS", "qwen3-tts-0.6b-customvoice": "Qwen3TTS",
+          "qwen3-tts-1.7b-base": "Qwen3TTS", "qwen3-tts-1.7b-customvoice": "Qwen3TTS", "omnivoice": "OmniVoiceTTS",
+          "cosyvoice3": "CosyVoice3"}
 
 
 def create_local(name: str, cfg: dict):

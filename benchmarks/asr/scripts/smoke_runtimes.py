@@ -17,7 +17,7 @@ import soundfile as sf
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
 from runtimes.catalog import ASR  # noqa: E402
-from runtimes.servers import create_asr  # noqa: E402
+from asrkit.backends import create  # noqa: E402
 
 rows = json.loads((REPO / "data/eval/timing100/manifest.json").read_text(encoding="utf-8"))
 pick = [rows[0], next(r for r in rows if r["wav"].startswith("fleurs"))]
@@ -25,12 +25,11 @@ audios = [(r["ref"], sf.read(str(REPO / "data/eval/timing100" / r["wav"]), dtype
 names = sys.argv[1:] or [f"{rt}-{k}" for rt, d in ASR.items() for k in d]
 out = REPO / "data" / "smoke_asr.jsonl"
 for name in names:
-    rt, _, key = name.partition("-")
     rec = {"name": name, "t": time.strftime("%H:%M:%S")}
     t0 = time.time()
     asr = None
     try:
-        asr = create_asr(rt, key, device="cuda")
+        asr = create(name, device="cuda")  # 実行系の構成（crispasr-…）も、PyTorch などの構成も作れる
         rec["start_s"] = round(time.time() - t0, 1)
         res = []
         for ref, a in audios:
@@ -41,7 +40,7 @@ for name in names:
     except Exception as ex:  # noqa: BLE001
         rec["ok"], rec["error"] = False, f"{type(ex).__name__}: {ex}"[:400]
     finally:  # 失敗してもサーバーを閉じる（残すとメモリを使い続ける）
-        if asr is not None:
+        if asr is not None and hasattr(asr, "close"):
             asr.close()
     print(json.dumps(rec, ensure_ascii=False), flush=True)
     with out.open("a", encoding="utf-8") as f:

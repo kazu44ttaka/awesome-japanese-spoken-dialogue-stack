@@ -121,7 +121,9 @@ class OpenAIASR:
 
     def __call__(self, audio: np.ndarray) -> str:
         body, ctype = _multipart(self.fields, _wav_bytes(audio))
-        res = json.loads(_http(self.base_url + "/v1/audio/transcriptions", body, {"Content-Type": ctype}))
+        raw = _http(self.base_url + "/v1/audio/transcriptions", body, {"Content-Type": ctype})
+        # audio.cpp の Fun-ASR-Nano は、まれに UTF-8 の途中で切れたトークンを返す。止めずに「�」に置き換える
+        res = json.loads(raw.decode("utf-8", "replace"))
         return str(res.get("text", "")).strip()
 
     def close(self) -> None:
@@ -138,6 +140,7 @@ class OpenAITTS:
         self.base_url, self.model, self.server = base_url, model, server
         self._voices = voices
         self.options = options or {}
+        self.kana = False  # 真なら、文をカタカナの読みに直してから送る（CosyVoice3 は日本語をカタカナで受ける）
 
     def available(self) -> bool:
         return self.server is None or self.server.process.poll() is None
@@ -147,6 +150,9 @@ class OpenAITTS:
 
     def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
         import soundfile as sf
+
+        if self.kana:
+            text = to_kana(text)
 
         body = {**({"model": self.model} if self.model else {}), "input": text, "response_format": "wav", **self.options}
         if voice:
@@ -280,8 +286,16 @@ REF_WAV_24K = REPO / "data" / "voices" / "ref_ja_24k.wav"  # 24 kHz を求める
 REF_TEXT_FILE = REPO / "data" / "voices" / "ref_ja.txt"
 
 
-def _ref_text() -> str:
-    return REF_TEXT_FILE.read_text(encoding="utf-8").strip() if REF_TEXT_FILE.is_file() else ""
+def _ref_text(kana: bool = False) -> str:
+    text = REF_TEXT_FILE.read_text(encoding="utf-8").strip() if REF_TEXT_FILE.is_file() else ""
+    return to_kana(text) if kana and text else text
+
+
+def to_kana(text: str) -> str:
+    """漢字かな交じりの文を、発音どおりのカタカナにする（pyopenjtalk。「は」は「ワ」、長音は「ー」）。"""
+    import pyopenjtalk
+
+    return pyopenjtalk.g2p(text, kana=True)
 
 
 def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -> OpenAITTS:
@@ -296,7 +310,8 @@ def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -
         extra = list(spec.get("args", []))
         if clone:
             ref = REF_WAV_24K if spec.get("ref_24k") else REF_WAV
-            extra += ["--voice", str(ref)] + (["--ref-text", _ref_text()] if spec.get("ref_text", True) else [])
+            extra += ["--voice", str(ref)] + (["--ref-text", _ref_text(spec.get("kana", False))]
+                                              if spec.get("ref_text", True) else [])
         server, url = start_crispasr(spec["backend"], spec.get("model", "auto"), device, threads, extra,
                                      url=spec.get("url"), quant=spec.get("quant", "q8_0"), language=None)
         model = spec["backend"]
@@ -320,5 +335,6 @@ def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -
     else:
         raise ValueError(runtime)
     tts = OpenAITTS(url, model, server, voices, options)
+    tts.kana = bool(spec.get("kana"))
     tts.device = ("vulkan" if runtime == "speechcpp" else "cuda") if device.startswith("cuda") else "cpu"
     return tts
