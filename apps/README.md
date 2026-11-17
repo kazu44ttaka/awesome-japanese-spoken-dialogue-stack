@@ -2,20 +2,25 @@
 
 | アプリ | 内容 |
 |---|---|
-| [asr_demo.py](asr_demo.py) | マイクの声をその場で認識する。VAD で区切って確定・疑似ストリーミング・真のストリーミング（Nemotron） |
-| [tts_demo.py](tts_demo.py) | 文を読み上げ、最初の音が出るまでの時間と速さを見る。文ごとに合成して、できた文から再生できる |
+| [asr_demo.py](asr_demo.py)・[asr_web.py](asr_web.py) | マイクの声をその場で認識する。VAD で区切って確定・疑似ストリーミング・真のストリーミング（Nemotron） |
+| [tts_demo.py](tts_demo.py)・[tts_web.py](tts_web.py) | 文を読み上げ、最初の音が出るまでの時間と速さを見る。文ごとに合成して、できた文から再生できる |
 
-どちらも Python 3.11 以降と tkinter（Python に同梱）を使う。
+- `*_demo.py` はデスクトップのアプリ（PySide6。[MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) と同じ `pyside6-essentials==6.12.0`）。マイクと再生はこの PC の sounddevice
+- `*_web.py` はブラウザで使う版（FastAPI + uvicorn）。マイクと再生はブラウザで、認識・合成はこの PC で行う。起動するとブラウザが開く（ASR は http://127.0.0.1:8765 、TTS は http://127.0.0.1:8766 ）
+- 中身は共通（[asr_core.py](asr_core.py)・[tts_core.py](tts_core.py)）なので、どちらでも同じモデル・同じ設定で動く
+- ブラウザのマイクは安全な接続でしか使えない。この PC で開く（127.0.0.1 / localhost）なら使えるが、`--host 0.0.0.0` でほかの PC から開くときは HTTPS が要る（TTS の再生はそのまま使える）
+- Web 版を同時に使えるのは 1 つのページだけ（あとから開いたページが引き継ぐ）
 
 ## ASR デモ
 
 ```
 uv venv --python 3.11 .venv
-uv pip install --python .venv sherpa-onnx sounddevice soundfile numpy
+uv pip install --python .venv sherpa-onnx sounddevice soundfile numpy "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"
 # transformers / funasr のモデルも使うなら
 uv pip install --python .venv torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 uv pip install --python .venv "transformers>=5.16" funasr
-.venv/Scripts/python apps/asr_demo.py
+.venv/Scripts/python apps/asr_demo.py   # デスクトップ版
+.venv/Scripts/python apps/asr_web.py    # Web 版（--host / --port / --no-browser）
 ```
 
 sherpa-onnx のモデル（Nemotron を含む）は、選んで「読み込み」を押すと models/ に自動でダウンロードする。
@@ -58,8 +63,9 @@ Parakeet CTC 1.1B 日本語（有志による日本語版）も同じ環境で�
 ```
 uv venv --python 3.11 .venv-tts
 uv pip install --python .venv-tts torch==2.11.* torchaudio==2.11.* --index-url https://download.pytorch.org/whl/cu128
-uv pip install --python .venv-tts sounddevice soundfile numpy
-.venv-tts/Scripts/python apps/tts_demo.py
+uv pip install --python .venv-tts sounddevice soundfile numpy "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"
+.venv-tts/Scripts/python apps/tts_demo.py   # デスクトップ版
+.venv-tts/Scripts/python apps/tts_web.py    # Web 版
 ```
 
 エンジンの場所は `apps/tts_engines.example.toml` を `apps/tts_engines.toml` にコピーして書き換える。

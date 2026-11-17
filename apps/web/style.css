@@ -1,0 +1,70 @@
+/* asr_web.py / tts_web.py の共通の見た目 */
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1d2329;
+  --muted: #6b7480;
+  --border: #d9dee4;
+  --accent: #2f6fdb;
+  --accent-text: #ffffff;
+  --error: #c0392b;
+  --level: #2fa36b;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181c;
+    --panel: #1e2227;
+    --text: #e6e9ed;
+    --muted: #9aa3ad;
+    --border: #343a42;
+    --accent: #5b8ff0;
+    --accent-text: #0d1014;
+    --error: #ef7b6e;
+    --level: #4cc38a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+}
+main { max-width: 980px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; margin: 4px 0 12px; }
+h1 small { font-size: 13px; font-weight: normal; color: var(--muted); margin-left: 8px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.row > label.name { min-width: 4.5em; color: var(--muted); }
+select, input, textarea, button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+select.grow, textarea { flex: 1 1 320px; min-width: 0; }
+textarea { width: 100%; min-height: 96px; resize: vertical; }
+input[type="number"] { width: 6em; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button:disabled { opacity: 0.45; cursor: default; }
+.status { color: var(--muted); flex: 1 1 200px; }
+.status.error { color: var(--error); }
+.meter { width: 160px; height: 10px; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.meter > div { height: 100%; width: 0; background: var(--level); transition: width 80ms linear; }
+.partial { color: var(--muted); min-height: 1.6em; padding: 2px 4px; }
+.summary { font-weight: bold; min-height: 1.6em; }
+.log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 52vh; overflow-y: auto; padding: 4px; }
+.log .meta { color: var(--muted); font-size: 13px; padding-left: 2em; }
+.log .line { margin-top: 4px; }
+.note { color: var(--muted); font-size: 13px; }

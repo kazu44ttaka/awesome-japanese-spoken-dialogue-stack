@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日本語 TTS デモ</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <h1>日本語 TTS デモ <small>この PC で合成 → ブラウザで再生</small></h1>
+
+  <div class="panel">
+    <div class="row">
+      <label class="name" for="engine">エンジン</label>
+      <select id="engine" class="grow"></select>
+      <button id="load">読み込み</button>
+      <button id="startEngine">エンジンを起動</button>
+      <label><input id="gpu" type="checkbox" checked> GPU を使う</label>
+    </div>
+    <div class="row">
+      <label class="name" for="voice">声</label>
+      <select id="voice" class="grow"></select>
+      <label for="speed">速さ</label>
+      <input id="speed" type="number" min="0.5" max="2" step="0.1" value="1.0">
+    </div>
+    <div class="row">
+      <label class="name" for="sample">例文</label>
+      <select id="sample"></select>
+      <label><input id="split" type="checkbox" checked> 文ごとに合成して、できた文から再生（音声対話向け）</label>
+    </div>
+    <textarea id="text"></textarea>
+    <div class="row">
+      <button id="speak" class="primary" disabled>合成して再生</button>
+      <button id="stop">停止</button>
+      <a id="save" href="/api/last.wav" download="tts.wav"><button id="saveBtn" disabled>WAV で保存</button></a>
+      <span id="status" class="status">接続しています…</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="summary" class="summary"></div>
+    <div id="log" class="log"></div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let engines = [];
+let ws = null;
+let ready = false, speaking = false;
+let audioCtx = null, playHead = 0, sources = [];
+let tClick = 0, firstPlay = null, pendingIndex = null;
+
+function setStatus(text, error = false) {
+  $('status').textContent = text;
+  $('status').classList.toggle('error', error);
+}
+function syncButtons() { $('speak').disabled = !ready || speaking; }
+
+function setVoices(voices) {
+  $('voice').textContent = '';
+  for (const [id, label] of voices) { const o = document.createElement('option'); o.value = id; o.textContent = label; $('voice').append(o); }
+}
+
+function syncEngine() {
+  const e = engines[$('engine').selectedIndex];
+  $('startEngine').disabled = !e.http;
+  $('gpu').disabled = !e.http;
+  setStatus(e.note);
+}
+
+function addLog(text, meta) {
+  const line = document.createElement('div'); line.className = 'line'; line.textContent = text;
+  $('log').append(line);
+  if (meta) { const m = document.createElement('div'); m.className = 'meta'; m.textContent = meta; $('log').append(m); }
+  $('log').scrollTop = $('log').scrollHeight;
+}
+
+async function playWav(buf) {
+  if (!audioCtx) audioCtx = new AudioContext();
+  const audio = await audioCtx.decodeAudioData(buf);
+  const src = audioCtx.createBufferSource();
+  src.buffer = audio;
+  src.connect(audioCtx.destination);
+  const start = Math.max(audioCtx.currentTime + 0.02, playHead);
+  src.start(start);
+  playHead = start + audio.duration;
+  sources.push(src);
+  if (firstPlay === null) {
+    // 押してから、ブラウザで最初の音が鳴り始めるまで
+    firstPlay = performance.now() - tClick + (start - audioCtx.currentTime) * 1000;
+  }
+}
+
+function stopPlayback() {
+  for (const s of sources) { try { s.stop(); } catch (e) { /* もう終わっている */ } }
+  sources = [];
+  playHead = 0;
+}
+
+function connect() {
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+  ws.onclose = () => { ready = false; syncButtons(); setStatus('サーバーとの接続が切れました。ページを再読み込みしてください', true); };
+  // 音声のデコードを待つあいだに次の通知を処理しないよう、届いた順に 1 つずつ処理する
+  let chain = Promise.resolve();
+  ws.onmessage = (ev) => { chain = chain.then(() => handle(ev)).catch((e) => setStatus(`${e}`, true)); };
+  const handle = async (ev) => {
+    if (ev.data instanceof ArrayBuffer) { pendingIndex = null; await playWav(ev.data); return; }
+    const msg = JSON.parse(ev.data);
+    const d = msg.data || [];
+    switch (msg.type) {
+      case 'state':
+        ready = msg.ready;
+        if (msg.engine) { const i = engines.findIndex((e) => e.name === msg.engine); if (i >= 0) $('engine').selectedIndex = i; }
+        setVoices(msg.voices || []);
+        if (msg.status) setStatus(msg.status);
+        $('load').disabled = msg.loading;
+        break;
+      case 'status': setStatus(d[0]); break;
+      case 'loaded':
+        ready = true; $('load').disabled = false; setVoices(d[0]);
+        setStatus(`読み込み完了（${d[1].toFixed(1)} 秒）・声 ${d[0].length} 種類`);
+        break;
+      case 'error': $('load').disabled = false; setStatus(d[0], true); break;
+      case 'audio': pendingIndex = msg.index; break;
+      case 'sentence': {
+        const [i, n, sentence, ms, dur] = d;
+        addLog(`[${i}/${n}] ${sentence}`, `合成 ${ms.toFixed(0)} ms・音声 ${dur.toFixed(1)} 秒・RTF ${(ms / 1000 / Math.max(dur, 1e-6)).toFixed(3)}`);
+        break;
+      }
+      case 'done': {
+        const [first, total, audioS, n] = d;
+        speaking = false;
+        if (first !== null) {
+          const rtf = total / 1000 / Math.max(audioS, 1e-6);
+          const play = firstPlay === null ? '' : `（ブラウザで鳴るまで ${firstPlay.toFixed(0)} ms）`;
+          $('summary').textContent = `最初の音まで ${first.toFixed(0)} ms${play} ・ 全体の合成 ${total.toFixed(0)} ms ・ 音声 ${audioS.toFixed(1)} 秒 ・ RTF ${rtf.toFixed(3)}（${n} 文）`;
+          addLog('─'.repeat(40));
+          $('saveBtn').disabled = false;
+        } else {
+          $('summary').textContent = '';
+        }
+        break;
+      }
+    }
+    syncButtons();
+  };
+}
+
+$('engine').onchange = () => { ready = false; setVoices([]); syncButtons(); syncEngine(); ws.send(JSON.stringify({type: 'reset'})); };
+$('load').onclick = () => { ready = false; $('load').disabled = true; syncButtons(); ws.send(JSON.stringify({type: 'load', name: engines[$('engine').selectedIndex].name})); };
+$('startEngine').onclick = () => ws.send(JSON.stringify({type: 'start_engine', name: engines[$('engine').selectedIndex].name, use_gpu: $('gpu').checked}));
+$('speak').onclick = () => {
+  const text = $('text').value.trim();
+  if (!text) return;
+  if (!audioCtx) audioCtx = new AudioContext();  // ボタンを押したときに作る（ブラウザの自動再生の制限）
+  audioCtx.resume();
+  stopPlayback();
+  tClick = performance.now(); firstPlay = null; speaking = true; syncButtons();
+  $('summary').textContent = '合成中…';
+  ws.send(JSON.stringify({type: 'speak', text, voice: $('voice').value, speed: Number($('speed').value), split: $('split').checked}));
+};
+$('stop').onclick = () => { ws.send(JSON.stringify({type: 'stop'})); stopPlayback(); };
+$('saveBtn').onclick = (e) => { if ($('saveBtn').disabled) e.preventDefault(); };
+$('sample').onchange = () => { $('text').value = samples[$('sample').value]; };
+
+let samples = {};
+fetch('/api/engines').then((r) => r.json()).then((j) => {
+  engines = j.engines; samples = j.samples;
+  for (const e of engines) { const o = document.createElement('option'); o.value = e.name; o.textContent = e.label; $('engine').append(o); }
+  $('engine').selectedIndex = Math.max(0, engines.findIndex((e) => e.name === j.default));
+  for (const k of Object.keys(samples)) { const o = document.createElement('option'); o.value = k; o.textContent = k; $('sample').append(o); }
+  $('text').value = Object.values(samples)[0] || '';
+  syncEngine();
+  connect();
+});
+</script>
+</body>
+</html>
