@@ -11,42 +11,43 @@
   <h1>日本語 TTS デモ <small>この PC で合成 → ブラウザで再生</small></h1>
 
   <section class="panel">
-    <h2>エンジン</h2>
+    <h2>TTS制御</h2>
     <div class="row">
-      <label class="name" for="engine">エンジン</label>
+      <label class="name" for="engine">TTSエンジン</label>
       <select id="engine" class="grow"></select>
     </div>
     <div class="row">
-      <label class="name" for="device">デバイス</label>
+      <label class="name" id="deviceLabel" for="device">Device</label>
       <select id="device"></select>
       <button id="start" class="primary" title="エンジンを使える状態にする。AivisSpeech / VOICEVOX は動いていなければ立ち上げる">起動</button>
       <button id="stopEngine" title="エンジンを止める（このアプリが立ち上げたエンジンだけ。前から動いていたものはそのまま）">停止</button>
     </div>
     <div class="row">
       <label class="name">状態</label>
-      <span class="state"><span id="lamp" class="lamp"></span><span id="stateText">停止</span></span>
+      <span class="state"><span id="lamp" class="lamp"></span>TTS <span id="stateText">停止</span></span>
       <span id="stateDetail" class="status"></span>
     </div>
   </section>
 
   <section class="panel">
-    <h2>読み上げ</h2>
+    <h2>TTSテスト</h2>
     <div class="row">
-      <label class="name" for="voice">声</label>
+      <label class="name" for="voice">Voice/Speaker</label>
       <select id="voice" class="grow"></select>
-      <label for="speed">速さ</label>
-      <input id="speed" type="number" min="0.5" max="2" step="0.1" value="1.0">
+      <label for="speed">話速（1.00が標準）</label>
+      <input id="speed" type="number" min="0.5" max="2" step="0.05" value="1.00">
     </div>
     <div class="row">
-      <label class="name" for="sink">スピーカー</label>
-      <select id="sink" class="grow"><option value="">既定のデバイス</option></select>
+      <label class="name" for="sink">スピーカーデバイス</label>
+      <select id="sink" class="grow"><option value="">default</option></select>
       <label for="sample">例文</label>
       <select id="sample"></select>
     </div>
     <div class="row"><label><input id="split" type="checkbox" checked> 文ごとに合成して、できた文から再生（音声対話向け）</label></div>
+    <div class="row"><label class="name" for="text">テスト発話</label></div>
     <textarea id="text"></textarea>
     <div class="row">
-      <button id="speak" class="primary" disabled>合成して再生</button>
+      <button id="speak" class="primary" disabled title="テスト発話を合成して再生する">TTSテスト</button>
       <button id="halt">再生を止める</button>
       <button id="save" disabled>WAV で保存</button>
       <span id="status" class="status"></span>
@@ -81,9 +82,11 @@ function syncButtons() {
 function syncEngine() {
   const e = engine();
   $('device').textContent = '';
+  $('deviceLabel').textContent = e.device_label;
   const items = e.devices.length ? e.devices : [e.fixed_device];
   for (const d of items) { const o = document.createElement('option'); o.value = e.devices.length ? d : ''; o.textContent = d; $('device').append(o); }
   $('device').disabled = !e.devices.length;
+  if (e.default_device) $('device').value = e.default_device;
   $('device').title = !e.devices.length ? 'このエンジンはデバイスを選べない' : (e.http ? 'AivisSpeech / VOICEVOX は、このアプリが立ち上げるときだけ効く' : '');
   if (state !== 'running' && state !== 'starting') $('stateDetail').textContent = e.note;
 }
@@ -151,7 +154,7 @@ async function handle(ev) {
       if (first !== null) {
         const rtf = total / 1000 / Math.max(audioS, 1e-6);
         const play = firstPlay === null ? '' : `（ブラウザで鳴るまで ${firstPlay.toFixed(0)} ms）`;
-        $('summary').textContent = `最初の音まで ${first.toFixed(0)} ms${play} ・ 全体の合成 ${total.toFixed(0)} ms ・ 音声 ${audioS.toFixed(1)} 秒 ・ RTF ${rtf.toFixed(3)}（${n} 文）`;
+        $('summary').textContent = `再生開始まで ${first.toFixed(0)} ms${play} ・ 全体の合成 ${total.toFixed(0)} ms ・ 音声 ${audioS.toFixed(1)} 秒 ・ RTF ${rtf.toFixed(3)}（${n} 文）`;
         addLog('─'.repeat(40));
         $('save').disabled = false;
       } else {

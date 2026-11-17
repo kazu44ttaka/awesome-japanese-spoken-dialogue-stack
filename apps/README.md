@@ -15,7 +15,8 @@
   「起動」で立ち上げ、「停止」で止める（前から動いていたエンジンはそのまま）
 - ASR の区切り方と疑似ストリーミングは MaAI-SDS と同じしくみ・同じ既定値（Silero VAD の確率で判定。開始 0.7 が 0.1 秒、
   終了 0.3 が 0.1 秒、プリロール 0.2 秒、途中経過は音声 0.25 秒ごと、0.4 秒より短い区間は直前の途中経過で確定）。
-  画面で変えられる
+  画面の「共通設定」で変えられる（項目名も MaAI-SDS と同じ: VAD ON threshold・VAD ON sec・VAD OFF threshold・VAD OFF sec・Min segment sec・Pre-roll buffer sec・Pseudo streaming・Pseudo chunk sec）。
+- ほかの項目名も MaAI-SDS に合わせている（ASRエンジン・Device・マイクデバイス、TTS制御・TTSエンジン・VOICEVOX Core Device・Voice/Speaker・話速（1.00が標準）・TTSテスト・テスト発話・再生開始まで）
 
 ## ASR デモ
 

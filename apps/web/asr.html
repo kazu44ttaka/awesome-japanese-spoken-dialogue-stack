@@ -11,45 +11,44 @@
   <h1>日本語 ASR デモ <small>ブラウザのマイク → この PC で認識</small></h1>
 
   <section class="panel">
-    <h2>モデル</h2>
+    <h2>ASR制御</h2>
     <div class="row">
-      <label class="name" for="model">モデル</label>
+      <label class="name" for="model">ASRエンジン</label>
       <select id="model" class="grow"></select>
     </div>
     <div class="row">
-      <label class="name" for="device">デバイス</label>
-      <select id="device"><option value="cuda">GPU (CUDA)</option><option value="cpu">CPU</option></select>
+      <label class="name" for="device">Device</label>
+      <select id="device"><option value="cuda">cuda</option><option value="cpu">cpu</option></select>
       <button id="startModel" class="primary" title="モデルを読み込んで、すぐ認識できる状態にする（初回はダウンロードする）">起動</button>
       <button id="stopModel" title="モデルを閉じてメモリを空ける">停止</button>
     </div>
     <div class="row">
       <label class="name">状態</label>
-      <span class="state"><span id="lamp" class="lamp"></span><span id="stateText">停止</span></span>
-      <span id="stateDetail" class="status">モデルとデバイスを選んで「起動」を押してください</span>
+      <span class="state"><span id="lamp" class="lamp"></span>ASR <span id="stateText">停止</span></span>
+      <span id="stateDetail" class="status">ASRエンジンと Device を選んで「起動」を押してください</span>
     </div>
   </section>
 
   <section class="panel">
-    <h2>区切り方・疑似ストリーミング <small>既定値は MaAI-SDS と同じ</small></h2>
-    <div class="row"><label><input id="pseudo" type="checkbox"> 疑似ストリーミング（話している途中も認識し直して途中経過を出す）</label></div>
+    <h2>共通設定 <small>MaAI-SDS の ASR の「共通設定」と同じ項目・既定値</small></h2>
     <div class="grid">
-      <label for="pseudo_chunk_sec" title="音声のこの秒数ごとに、区間の頭から認識し直す">途中経過の間隔（秒）</label><input id="pseudo_chunk_sec" type="number" step="0.05" min="0.05">
-      <label for="vad_on_threshold" title="Silero VAD の確率がこれを超えたら話している">開始のしきい値</label><input id="vad_on_threshold" type="number" step="0.05" min="0" max="1">
-      <label for="pre_roll_sec" title="発話の始まりと判定する前の音も、この秒数だけ区間に入れる">プリロール（秒）</label><input id="pre_roll_sec" type="number" step="0.05" min="0">
-      <label for="vad_on_sec" title="しきい値を超える状態がこの秒数続いたら発話の始まり">開始の時間（秒）</label><input id="vad_on_sec" type="number" step="0.05" min="0.03">
-      <label for="min_segment_sec" title="これより短い区間は認識せず、直前の途中経過で確定する">最短の区間（秒）</label><input id="min_segment_sec" type="number" step="0.05" min="0">
-      <label for="vad_off_threshold" title="Silero VAD の確率がこれを下回ったら黙っている">終了のしきい値</label><input id="vad_off_threshold" type="number" step="0.05" min="0" max="1">
-      <span></span><span></span>
-      <label for="vad_off_sec" title="しきい値を下回る状態がこの秒数続いたら発話の終わり">終了の時間（秒）</label><input id="vad_off_sec" type="number" step="0.05" min="0.03">
+      <label for="vad_on_threshold" title="Silero VAD の確率がこれを超えたら話している">VAD ON threshold</label><input id="vad_on_threshold" type="number" step="0.05" min="0" max="1">
+      <label for="min_segment_sec" title="これより短い区間は認識せず、直前の途中経過で確定する">Min segment sec</label><input id="min_segment_sec" type="number" step="0.05" min="0">
+      <label for="vad_on_sec" title="ON threshold を超える状態がこの秒数続いたら発話の始まり">VAD ON sec</label><input id="vad_on_sec" type="number" step="0.05" min="0.03">
+      <label for="pre_roll_buffer_sec" title="発話の始まりと判定する前の音も、この秒数だけ区間に入れる">Pre-roll buffer sec</label><input id="pre_roll_buffer_sec" type="number" step="0.05" min="0">
+      <label for="vad_off_threshold" title="Silero VAD の確率がこれを下回ったら黙っている">VAD OFF threshold</label><input id="vad_off_threshold" type="number" step="0.05" min="0" max="1">
+      <label for="pseudo" title="疑似ストリーミング: 話している途中も、区間の頭から認識し直して途中経過を出す">Pseudo streaming</label><label><input id="pseudo" type="checkbox"> 有効</label>
+      <label for="vad_off_sec" title="OFF threshold を下回る状態がこの秒数続いたら発話の終わり">VAD OFF sec</label><input id="vad_off_sec" type="number" step="0.05" min="0.03">
+      <label for="pseudo_chunk_sec" title="疑似ストリーミングで、音声のこの秒数ごとに区間の頭から認識し直す">Pseudo chunk sec</label><input id="pseudo_chunk_sec" type="number" step="0.05" min="0.05">
     </div>
-    <div class="row"><button id="resetOpts">既定に戻す</button></div>
+    <div class="row"><button id="resetOpts" title="MaAI-SDS の controller_config.json と同じ値に戻す">既定に戻す</button></div>
   </section>
 
   <section class="panel">
     <h2>聞き取り</h2>
     <div class="row">
-      <label class="name" for="mic">マイク</label>
-      <select id="mic" class="grow"><option value="">既定のデバイス</option></select>
+      <label class="name" for="mic">マイクデバイス</label>
+      <select id="mic" class="grow"><option value="">default</option></select>
       <button id="listen" class="primary" disabled>聞き取り開始</button>
       <button id="unlisten" disabled>聞き取り停止</button>
       <button id="clear">クリア</button>
@@ -67,7 +66,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const OPT_KEYS = ['pseudo_chunk_sec', 'pre_roll_sec', 'min_segment_sec', 'vad_on_threshold', 'vad_on_sec', 'vad_off_threshold', 'vad_off_sec'];
+const OPT_KEYS = ['pseudo_chunk_sec', 'pre_roll_buffer_sec', 'min_segment_sec', 'vad_on_threshold', 'vad_on_sec', 'vad_off_threshold', 'vad_off_sec'];
 let models = [], defaults = {}, labels = {}, colors = {};
 let ws = null, state = 'stopped', listening = false;
 let audioCtx = null, mediaStream = null, worklet = null;
@@ -115,7 +114,7 @@ function setState(s, detail) {
   state = s;
   $('lamp').style.background = colors[s] || '#9e9e9e';
   $('stateText').textContent = labels[s] || s;
-  $('stateDetail').textContent = detail || (s === 'stopped' ? 'モデルとデバイスを選んで「起動」を押してください' : '');
+  $('stateDetail').textContent = detail || (s === 'stopped' ? 'ASRエンジンと Device を選んで「起動」を押してください' : '');
   $('stateDetail').classList.toggle('error', s === 'error');
   if (s !== 'running' && listening) stopListening(false);
   syncButtons();
@@ -192,7 +191,7 @@ async function listMics() {
     const devs = await navigator.mediaDevices.enumerateDevices();
     const cur = $('mic').value;
     $('mic').textContent = '';
-    const def = document.createElement('option'); def.value = ''; def.textContent = '既定のデバイス'; $('mic').append(def);
+    const def = document.createElement('option'); def.value = ''; def.textContent = 'default'; $('mic').append(def);
     devs.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications').forEach((d, i) => {
       const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || `マイク ${i + 1}`; $('mic').append(o);
     });

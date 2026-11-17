@@ -6,9 +6,12 @@
 エンジンの場所（モデル・実行ファイル・辞書など）は apps/tts_engines.toml に書く
 （apps/tts_engines.example.toml をコピー）。必要なパッケージと入れ方は apps/README.md を参照。
 
-1. エンジンとデバイスを選んで「起動」（状態が「稼働」になったら使える。AivisSpeech / VOICEVOX は
+項目の名前は MaAI-SDS の画面に合わせている（TTS制御・TTSエンジン・VOICEVOX Core Device・Voice/Speaker・
+TTSテストなど）。
+
+1. TTSエンジンと Device を選んで「起動」（状態が「稼働」になったら使える。AivisSpeech / VOICEVOX は
    動いていなければ立ち上げる）
-2. 声とスピーカーを選んで「合成して再生」
+2. Voice/Speaker を選び、テスト発話を入れて「TTSテスト」
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ from PySide6.QtWidgets import (  # noqa: E402
 
 
 def list_output_devices() -> list[tuple[int | None, str]]:
-    out: list[tuple[int | None, str]] = [(None, "既定のデバイス")]
+    out: list[tuple[int | None, str]] = [(None, "default")]
     try:
         import sounddevice as sd
 
@@ -124,7 +127,8 @@ class Bridge(QObject):
 
 
 def state_html(state: str) -> str:
-    return f"<span style='color:{STATE_COLORS[state]}'>●</span> {STATE_LABELS[state]}"
+    """MaAI-SDS のモジュール状態パネルと同じ「ランプ・名前・状態」。"""
+    return f"<span style='color:{STATE_COLORS[state]}'>●</span>&nbsp;TTS&nbsp;&nbsp;{STATE_LABELS[state]}"
 
 
 class MainWindow(QMainWindow):
@@ -142,17 +146,18 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
-        # ---- エンジン
-        engine_box = QGroupBox("エンジン")
+        # ---- TTS制御
+        engine_box = QGroupBox("TTS制御")
         grid = QGridLayout(engine_box)
-        grid.addWidget(QLabel("エンジン"), 0, 0)
+        grid.addWidget(QLabel("TTSエンジン"), 0, 0)
         self.engine_combo = QComboBox()
         for e in self.engines:
             self.engine_combo.addItem(e["label"], e["name"])
         self.engine_combo.setCurrentIndex(next(i for i, e in enumerate(self.engines) if e["name"] == DEFAULT_ENGINE))
         self.engine_combo.currentIndexChanged.connect(self._sync_engine)
         grid.addWidget(self.engine_combo, 0, 1, 1, 3)
-        grid.addWidget(QLabel("デバイス"), 1, 0)
+        self.device_label = QLabel("Device")
+        grid.addWidget(self.device_label, 1, 0)
         self.device_combo = QComboBox()
         grid.addWidget(self.device_combo, 1, 1)
         self.start_btn = QPushButton("起動")
@@ -176,21 +181,22 @@ class MainWindow(QMainWindow):
         grid.setColumnStretch(3, 1)
         root.addWidget(engine_box)
 
-        # ---- 読み上げ
-        speak_box = QGroupBox("読み上げ")
+        # ---- TTSテスト
+        speak_box = QGroupBox("TTSテスト")
         sv = QVBoxLayout(speak_box)
         g2 = QGridLayout()
         sv.addLayout(g2)
-        g2.addWidget(QLabel("声"), 0, 0)
+        g2.addWidget(QLabel("Voice/Speaker"), 0, 0)
         self.voice_combo = QComboBox()
         g2.addWidget(self.voice_combo, 0, 1)
-        g2.addWidget(QLabel("速さ"), 0, 2)
+        g2.addWidget(QLabel("話速（1.00が標準）"), 0, 2)
         self.speed = QDoubleSpinBox()
         self.speed.setRange(0.5, 2.0)
         self.speed.setSingleStep(0.1)
         self.speed.setValue(1.0)
+        self.speed.setDecimals(2)
         g2.addWidget(self.speed, 0, 3)
-        g2.addWidget(QLabel("スピーカー"), 1, 0)
+        g2.addWidget(QLabel("スピーカーデバイス"), 1, 0)
         self.out_combo = QComboBox()
         for idx, label in list_output_devices():
             self.out_combo.addItem(label, idx)
@@ -205,13 +211,15 @@ class MainWindow(QMainWindow):
         self.split_check = QCheckBox("文ごとに合成して、できた文から再生（音声対話向け）")
         self.split_check.setChecked(True)
         sv.addWidget(self.split_check)
+        sv.addWidget(QLabel("テスト発話"))
         self.text = QPlainTextEdit(SAMPLES["あいさつ"])
         self.text.setFont(QFont("Yu Gothic UI", 11))
         self.text.setFixedHeight(100)
         sv.addWidget(self.text)
         ctrl = QHBoxLayout()
         sv.addLayout(ctrl)
-        self.speak_btn = QPushButton("合成して再生")
+        self.speak_btn = QPushButton("TTSテスト")
+        self.speak_btn.setToolTip("テスト発話を合成して再生する")
         self.speak_btn.clicked.connect(self._speak)
         self.halt_btn = QPushButton("再生を止める")
         self.halt_btn.clicked.connect(self._halt)
@@ -250,8 +258,10 @@ class MainWindow(QMainWindow):
     def _sync_engine(self) -> None:
         e = self._engine()
         self.device_combo.clear()
+        self.device_label.setText(e["device_label"])
         if e["devices"]:
             self.device_combo.addItems(e["devices"])
+            self.device_combo.setCurrentText(e["default_device"])
             self.device_combo.setEnabled(True)
             self.device_combo.setToolTip("AivisSpeech / VOICEVOX は、このアプリが立ち上げるときだけ効く" if e["http"] else "")
         else:
@@ -335,7 +345,7 @@ class MainWindow(QMainWindow):
             first, total, audio_s, n = data
             if first is not None:
                 rtf = total / 1000 / max(audio_s, 1e-6)
-                self.summary.setText(f"最初の音まで {first:.0f} ms ・ 全体の合成 {total:.0f} ms ・ 音声 {audio_s:.1f} 秒"
+                self.summary.setText(f"再生開始まで {first:.0f} ms ・ 全体の合成 {total:.0f} ms ・ 音声 {audio_s:.1f} 秒"
                                      f" ・ RTF {rtf:.3f}（{n} 文）")
                 self._append("<span style='color:#888'>" + "─" * 40 + "</span>")
             else:

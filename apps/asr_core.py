@@ -50,7 +50,8 @@ Emit = Callable[..., None]
 
 @dataclass
 class ListenOptions:
-    """区切り方と疑似ストリーミングの設定。既定値は MaAI-SDS の controller_config.json と同じ。"""
+    """区切り方と疑似ストリーミングの設定。名前と既定値は MaAI-SDS の controller_config.json の asr_* と同じ
+    （asr_vad_on_threshold → vad_on_threshold、asr_nonstream_pseudo_chunk_sec → pseudo_chunk_sec など）。"""
 
     pseudo: bool = True  # 疑似ストリーミング（途中経過も出す）
     pseudo_chunk_sec: float = 0.25  # 途中経過を出す間隔（音声の秒数）
@@ -58,7 +59,7 @@ class ListenOptions:
     vad_on_sec: float = 0.1  # 始まりとみなすまでに続く時間
     vad_off_threshold: float = 0.3  # 発話の終わりとみなす確率
     vad_off_sec: float = 0.1  # 終わりとみなすまでに続く時間
-    pre_roll_sec: float = 0.2  # 始まりの前から区間に入れる長さ
+    pre_roll_buffer_sec: float = 0.2  # 始まりの前から区間に入れる長さ
     min_segment_sec: float = 0.4  # これより短い区間は認識しない（直前の途中経過で確定）
 
     @classmethod
@@ -82,8 +83,8 @@ def model_choices() -> list[dict]:
 
 
 def list_audio_devices(kind: str) -> list[tuple[int | None, str]]:
-    """マイク（kind="input"）かスピーカー（"output"）。既定の API の機器だけ、先頭は「既定」。"""
-    out: list[tuple[int | None, str]] = [(None, "既定のデバイス")]
+    """マイク（kind="input"）かスピーカー（"output"）。既定の API の機器だけ、先頭は default（MaAI-SDS と同じ）。"""
+    out: list[tuple[int | None, str]] = [(None, "default")]
     try:
         import sounddevice as sd
 
@@ -272,7 +273,7 @@ class AsrSession:
         frame_hz = RATE / WINDOW
         on_frames = max(1, math.ceil(o.vad_on_sec * frame_hz))
         off_frames = max(1, math.ceil(o.vad_off_sec * frame_hz))
-        pre_frames = max(1, math.ceil(o.pre_roll_sec * frame_hz))
+        pre_frames = max(1, math.ceil(o.pre_roll_buffer_sec * frame_hz))
         chunk_samples = max(1, int(RATE * o.pseudo_chunk_sec))
         pre: deque = deque(maxlen=pre_frames)
         segment: list[np.ndarray] = []

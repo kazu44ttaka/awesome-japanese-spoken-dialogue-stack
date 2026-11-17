@@ -6,8 +6,10 @@
 ブラウザで使うときは apps/asr_web.py。中身（区切り方と疑似ストリーミング）は apps/asr_core.py にあり、
 MaAI-SDS の ASR と同じしくみ・同じ既定値。
 
-1. モデルとデバイスを選んで「起動」（状態が「稼働」になったら使える）
-2. マイクを選んで「聞き取り開始」。話し終わると確定した文が下に出る
+項目の名前は MaAI-SDS の画面に合わせている（ASRエンジン・Device・共通設定の VAD ON threshold など）。
+
+1. ASRエンジンと Device を選んで「起動」（状態が「稼働」になったら使える）
+2. マイクデバイスを選んで「聞き取り開始」。話し終わると確定した文が下に出る
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from PySide6.QtWidgets import (  # noqa: E402
     QMainWindow, QProgressBar, QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
 
-DEVICES = [("GPU (CUDA)", "cuda"), ("CPU", "cpu")]
+DEVICES = ["cuda", "cpu"]  # MaAI-SDS の ASR の Device と同じ
 
 
 class Bridge(QObject):
@@ -40,7 +42,8 @@ class Bridge(QObject):
 
 
 def state_html(state: str) -> str:
-    return f"<span style='color:{STATE_COLORS[state]}'>●</span> {STATE_LABELS[state]}"
+    """MaAI-SDS のモジュール状態パネルと同じ「ランプ・名前・状態」。"""
+    return f"<span style='color:{STATE_COLORS[state]}'>●</span>&nbsp;ASR&nbsp;&nbsp;{STATE_LABELS[state]}"
 
 
 class MainWindow(QMainWindow):
@@ -57,20 +60,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
-        # ---- モデル
-        model_box = QGroupBox("モデル")
+        # ---- ASR エンジン
+        model_box = QGroupBox("ASR制御")
         grid = QGridLayout(model_box)
-        grid.addWidget(QLabel("モデル"), 0, 0)
+        grid.addWidget(QLabel("ASRエンジン"), 0, 0)
         self.model_combo = QComboBox()
         for m in self.models:
             self.model_combo.addItem(m["label"], m["name"])
         self.model_combo.setCurrentIndex(next(i for i, m in enumerate(self.models) if m["name"] == DEFAULT_MODEL))
         self.model_combo.currentIndexChanged.connect(self._sync_device)
         grid.addWidget(self.model_combo, 0, 1, 1, 3)
-        grid.addWidget(QLabel("デバイス"), 1, 0)
+        grid.addWidget(QLabel("Device"), 1, 0)
         self.device_combo = QComboBox()
-        for label, value in DEVICES:
-            self.device_combo.addItem(label, value)
+        self.device_combo.addItems(DEVICES)
         grid.addWidget(self.device_combo, 1, 1)
         self.start_model_btn = QPushButton("起動")
         self.start_model_btn.setToolTip("モデルを読み込んで、すぐ認識できる状態にする（初回はダウンロードする）")
@@ -86,23 +88,23 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel("状態"), 2, 0)
         self.state_label = QLabel(state_html("stopped"))
         grid.addWidget(self.state_label, 2, 1)
-        self.state_detail = QLabel("モデルとデバイスを選んで「起動」を押してください")
+        self.state_detail = QLabel("ASRエンジンと Device を選んで「起動」を押してください")
         self.state_detail.setWordWrap(True)
         self.state_detail.setStyleSheet("color:#777")
         grid.addWidget(self.state_detail, 2, 2, 1, 2)
         grid.setColumnStretch(3, 1)
         root.addWidget(model_box)
 
-        # ---- 区切り方・疑似ストリーミング
-        opt_box = QGroupBox("区切り方・疑似ストリーミング（既定値は MaAI-SDS と同じ）")
+        # ---- 共通設定（MaAI-SDS の ASR の「共通設定」と同じ項目・並び・既定値）
+        opt_box = QGroupBox("共通設定")
         opt = QHBoxLayout(opt_box)
         left, right = QFormLayout(), QFormLayout()
         opt.addLayout(left)
         opt.addSpacing(24)
         opt.addLayout(right)
         opt.addStretch(1)
-        self.pseudo_check = QCheckBox("疑似ストリーミング（話している途中も認識し直して途中経過を出す）")
-        left.addRow(self.pseudo_check)
+        self.pseudo_check = QCheckBox("有効")
+        self.pseudo_check.setToolTip("疑似ストリーミング: 話している途中も、区間の頭から認識し直して途中経過を出す")
         self.fields: dict[str, QDoubleSpinBox] = {}
 
         def spin(key: str, lo: float, hi: float, step: float, form: QFormLayout, label: str, tip: str) -> None:
@@ -114,14 +116,16 @@ class MainWindow(QMainWindow):
             form.addRow(label, box)
             self.fields[key] = box
 
-        spin("pseudo_chunk_sec", 0.05, 3.0, 0.05, left, "途中経過の間隔（秒）", "音声のこの秒数ごとに、区間の頭から認識し直す")
-        spin("pre_roll_sec", 0.0, 2.0, 0.05, left, "プリロール（秒）", "発話の始まりと判定する前の音も、この秒数だけ区間に入れる")
-        spin("min_segment_sec", 0.0, 3.0, 0.05, left, "最短の区間（秒）", "これより短い区間は認識せず、直前の途中経過で確定する")
-        spin("vad_on_threshold", 0.05, 0.99, 0.05, right, "開始のしきい値", "Silero VAD の確率がこれを超えたら話している")
-        spin("vad_on_sec", 0.03, 2.0, 0.05, right, "開始の時間（秒）", "しきい値を超える状態がこの秒数続いたら発話の始まり")
-        spin("vad_off_threshold", 0.01, 0.95, 0.05, right, "終了のしきい値", "Silero VAD の確率がこれを下回ったら黙っている")
-        spin("vad_off_sec", 0.03, 3.0, 0.05, right, "終了の時間（秒）", "しきい値を下回る状態がこの秒数続いたら発話の終わり")
+        spin("vad_on_threshold", 0.05, 0.99, 0.05, left, "VAD ON threshold", "Silero VAD の確率がこれを超えたら話している")
+        spin("vad_on_sec", 0.03, 2.0, 0.05, left, "VAD ON sec", "ON threshold を超える状態がこの秒数続いたら発話の始まり")
+        spin("vad_off_threshold", 0.01, 0.95, 0.05, left, "VAD OFF threshold", "Silero VAD の確率がこれを下回ったら黙っている")
+        spin("vad_off_sec", 0.03, 3.0, 0.05, left, "VAD OFF sec", "OFF threshold を下回る状態がこの秒数続いたら発話の終わり")
+        spin("min_segment_sec", 0.0, 3.0, 0.05, right, "Min segment sec", "これより短い区間は認識せず、直前の途中経過で確定する")
+        spin("pre_roll_buffer_sec", 0.0, 2.0, 0.05, right, "Pre-roll buffer sec", "発話の始まりと判定する前の音も、この秒数だけ区間に入れる")
+        right.addRow("Pseudo streaming", self.pseudo_check)
+        spin("pseudo_chunk_sec", 0.05, 3.0, 0.05, right, "Pseudo chunk sec", "疑似ストリーミングで、音声のこの秒数ごとに区間の頭から認識し直す")
         reset_btn = QPushButton("既定に戻す")
+        reset_btn.setToolTip("MaAI-SDS の controller_config.json と同じ値に戻す")
         reset_btn.clicked.connect(lambda: self._set_options(ListenOptions()))
         right.addRow(reset_btn)
         self._set_options(ListenOptions())
@@ -132,7 +136,7 @@ class MainWindow(QMainWindow):
         lv = QVBoxLayout(listen_box)
         row = QHBoxLayout()
         lv.addLayout(row)
-        row.addWidget(QLabel("マイク"))
+        row.addWidget(QLabel("マイクデバイス"))
         self.mic_combo = QComboBox()
         for idx, label in list_audio_devices("input"):
             self.mic_combo.addItem(label, idx)
@@ -186,7 +190,7 @@ class MainWindow(QMainWindow):
     def _sync_device(self) -> None:
         gpu = self._model()["gpu"]
         if not gpu:
-            self.device_combo.setCurrentIndex(1)
+            self.device_combo.setCurrentText("cpu")
         self.device_combo.setEnabled(gpu)
         self.device_combo.setToolTip("" if gpu else "このモデルは CPU で動かす")
 
@@ -214,7 +218,7 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------- actions
     def _start_model(self) -> None:
         self._stop()
-        self.session.start_model(self._model()["name"], self.device_combo.currentData(), threads=8)
+        self.session.start_model(self._model()["name"], self.device_combo.currentText(), threads=8)
 
     def _start(self) -> None:
         o = self._options()
@@ -250,7 +254,7 @@ class MainWindow(QMainWindow):
             if detail:
                 self.state_detail.setText(detail)
             elif state == "stopped":
-                self.state_detail.setText("モデルとデバイスを選んで「起動」を押してください")
+                self.state_detail.setText("ASRエンジンと Device を選んで「起動」を押してください")
             if state != "running":
                 self._stop()
             self._sync_buttons()

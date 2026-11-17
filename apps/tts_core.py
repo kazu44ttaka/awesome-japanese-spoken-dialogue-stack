@@ -34,15 +34,18 @@ from ttskit.backends import BACKENDS, VoicevoxCompatible, create, load_config, s
 DEFAULT_ENGINE = "aivisspeech"
 HTTP_ENGINES = ("aivisspeech", "voicevox")  # 別に動くエンジンへ HTTP でつなぐもの（なければ立ち上げる）
 
-# エンジンごとのデバイスの選択肢（先頭が既定）。ここに無いエンジンは選べない（固定の説明だけ出す）
-DEVICE_CHOICES: dict[str, list[str]] = {
-    "aivisspeech": ["GPU", "CPU"],
-    "voicevox": ["GPU", "CPU"],
-    "voicevox_core": ["GPU", "CPU"],
-    "irodori": ["GPU", "CPU"],
-    "kitten": ["GPU", "CPU"],
-    "moss_nano": ["CPU", "GPU"],
+# エンジンごとのデバイスの項目名と選択肢（既定は default）。名前と選択肢は MaAI-SDS の画面に合わせる
+# （VOICEVOX Core Device は AUTO / CPU / GPU (CUDA)、PyTorch のエンジンは cuda / cpu）。
+# ここに無いエンジンは選べない（固定の説明だけ出す）
+DEVICE_SPECS: dict[str, dict] = {
+    "aivisspeech": {"label": "AivisSpeech Device", "choices": ["GPU", "CPU"], "default": "GPU"},
+    "voicevox": {"label": "VOICEVOX Device", "choices": ["GPU", "CPU"], "default": "GPU"},
+    "voicevox_core": {"label": "VOICEVOX Core Device", "choices": ["AUTO", "CPU", "GPU (CUDA)"], "default": "GPU (CUDA)"},
+    "irodori": {"label": "Irodori Device", "choices": ["cuda", "cpu"], "default": "cuda"},
+    "kitten": {"label": "Kitten Device", "choices": ["cuda", "cpu"], "default": "cuda"},
+    "moss_nano": {"label": "MOSS-TTS-Nano Device", "choices": ["cuda", "cpu"], "default": "cpu"},
 }
+DEVICE_CHOICES = {k: v["choices"] for k, v in DEVICE_SPECS.items()}
 FIXED_DEVICE: dict[str, str] = {
     "supertonic": "CPU",
     "mio": "サーバーのビルドによる",
@@ -69,10 +72,14 @@ Emit = Callable[..., None]
 
 
 def engine_choices() -> list[dict]:
-    """[{name, label, note, http, devices, fixed_device}]。GUI と Web のエンジンの一覧。"""
-    return [{"name": b.name, "label": b.label, "note": b.note, "http": b.name in HTTP_ENGINES,
-             "devices": DEVICE_CHOICES.get(b.name, []), "fixed_device": FIXED_DEVICE.get(b.name, "既定")}
-            for b in BACKENDS.values()]
+    """[{name, label, note, http, device_label, devices, default_device, fixed_device}]。GUI と Web のエンジンの一覧。"""
+    out = []
+    for b in BACKENDS.values():
+        spec = DEVICE_SPECS.get(b.name, {})
+        out.append({"name": b.name, "label": b.label, "note": b.note, "http": b.name in HTTP_ENGINES,
+                    "device_label": spec.get("label", "Device"), "devices": spec.get("choices", []),
+                    "default_device": spec.get("default"), "fixed_device": FIXED_DEVICE.get(b.name, "既定")})
+    return out
 
 
 def to_wav_bytes(audio: np.ndarray, rate: int) -> bytes:
@@ -89,11 +96,10 @@ def _with_device(config: dict, name: str, device: str | None) -> dict:
     if not device or name not in DEVICE_CHOICES or name in HTTP_ENGINES:
         return cfg
     sec = cfg.setdefault(name, {})
-    gpu = device.upper() == "GPU"
     if name == "voicevox_core":
-        sec["acceleration"] = "GPU" if gpu else "CPU"
+        sec["acceleration"] = {"AUTO": "AUTO", "CPU": "CPU", "GPU (CUDA)": "GPU"}.get(device, "GPU")
     else:
-        sec["device"] = "cuda" if gpu else "cpu"
+        sec["device"] = device  # cuda / cpu
     return cfg
 
 
@@ -133,8 +139,8 @@ class TtsSession:
         if self.state == "starting":
             return
         self.cancel.set()
-        choices = DEVICE_CHOICES.get(name, [])
-        device = device if device in choices else (choices[0] if choices else None)
+        spec = DEVICE_SPECS.get(name)
+        device = (device if device in spec["choices"] else spec["default"]) if spec else None
         self._set_state("starting", f"{BACKENDS[name].label} を起動しています…")
 
         def run() -> None:
@@ -146,7 +152,7 @@ class TtsSession:
                     if not tts.available():
                         if isinstance(tts, VoicevoxCompatible):
                             self.emit("status", "エンジンが動いていないので立ち上げています…（1 分ほどかかることがあります）")
-                            if not tts.start_engine(use_gpu=(device or "GPU").upper() == "GPU"):
+                            if not tts.start_engine(use_gpu=(device or "GPU") == "GPU"):
                                 raise RuntimeError("エンジンを立ち上げられませんでした（既定の場所に入っていないかもしれません）")
                         else:
                             raise RuntimeError("エンジンにつながりません（apps/tts_engines.toml の設定を確かめてください）")
