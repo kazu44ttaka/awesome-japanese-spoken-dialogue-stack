@@ -558,6 +558,115 @@ class CosyVoice3:
         audio = np.concatenate([p.cpu().numpy().reshape(-1) for p in parts]) if parts else np.zeros(0)
         return audio.astype(np.float32), int(self.model.sample_rate)
 
+    def synthesize_stream(self, text: str, voice: str = ""):
+        """公式のストリーミング（stream=True）。音のかたまりを作れた順に返す（benchmarks/tts/scripts/stream_tts.py）。"""
+        for j in self.model.inference_zero_shot(text, self.prompt, self.ref_wav, stream=True):
+            yield j["tts_speech"].cpu().numpy().reshape(-1).astype(np.float32)
+
+    @property
+    def sample_rate(self) -> int:
+        return int(self.model.sample_rate)
+
+
+class StyleBertVITS2:
+    """Style-Bert-VITS2 JP-Extra（litagin の pip 版・PyTorch）。声は JVNV コーパス（CC BY-SA 4.0）で学習した
+    公式の例のモデル（設定の voice、既定 jvnv-F1-jp）。AivisSpeech はこの系統のモデルを ONNX で動かす。"""
+
+    def __init__(self, cfg: dict | None = None) -> None:
+        from huggingface_hub import hf_hub_download
+        from style_bert_vits2.constants import Languages
+        from style_bert_vits2.nlp import bert_models
+        from style_bert_vits2.tts_model import TTSModel
+
+        cfg = cfg or {}
+        bert = str(cfg.get("bert", "ku-nlp/deberta-v2-large-japanese-char-wwm"))
+        bert_models.load_model(Languages.JP, bert)
+        bert_models.load_tokenizer(Languages.JP, bert)
+        repo, voice = str(cfg.get("repo", "litagin/style_bert_vits2_jvnv")), str(cfg.get("voice", "jvnv-F1-jp"))
+        files = {"jvnv-F1-jp": "jvnv-F1-jp_e160_s14000.safetensors", "jvnv-F2-jp": "jvnv-F2_e166_s20000.safetensors",
+                 "jvnv-M1-jp": "jvnv-M1-jp_e158_s14000.safetensors", "jvnv-M2-jp": "jvnv-M2-jp_e159_s17000.safetensors"}
+        get = lambda f: hf_hub_download(repo, f"{voice}/{f}")  # noqa: E731
+        self.voice = voice
+        self.model = TTSModel(model_path=get(files[voice]), config_path=get("config.json"),
+                              style_vec_path=get("style_vectors.npy"), device=str(cfg.get("device", "cuda")))
+        self.model.load()
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [(self.voice, self.voice)]
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        rate, audio = self.model.infer(text=text, length=1.0 / max(0.1, speed))
+        audio = np.asarray(audio)
+        if audio.dtype == np.int16:
+            audio = audio.astype(np.float32) / 32768.0
+        return audio.astype(np.float32), int(rate)
+
+
+class GPTSoVITS:
+    """GPT-SoVITS（公式のリポジトリ models/src/GPT-SoVITS・PyTorch）。学習なしで、参照音声 data/voices/ref_ja.wav
+    （と書き起こし）から声をクローンする。版は設定の version（既定 v2ProPlus）。"""
+
+    WEIGHTS = {"v2ProPlus": ("s1v3.ckpt", "v2Pro/s2Gv2ProPlus.pth"), "v2Pro": ("s1v3.ckpt", "v2Pro/s2Gv2Pro.pth"),
+               "v4": ("s1v3.ckpt", "gsv-v4-pretrained/s2Gv4.pth")}
+
+    def __init__(self, cfg: dict | None = None) -> None:
+        import sys
+
+        cfg = cfg or {}
+        root = _path(cfg.get("root", "models/src/GPT-SoVITS"))
+        for sub in (root, root / "GPT_SoVITS"):
+            if str(sub) not in sys.path:
+                sys.path.insert(0, str(sub))
+        os.chdir(root)  # 中で pretrained_models などをリポジトリからの相対パスで読む
+        from TTS_infer_pack.TTS import TTS, TTS_Config
+
+        version = str(cfg.get("version", "v2ProPlus"))
+        pm = root / "GPT_SoVITS" / "pretrained_models"
+        t2s, vits = self.WEIGHTS[version]
+        dev = str(cfg.get("device", "cuda"))
+        conf = TTS_Config({"custom": {"device": dev, "is_half": dev.startswith("cuda"), "version": version,
+                                      "t2s_weights_path": str(pm / t2s), "vits_weights_path": str(pm / vits),
+                                      "bert_base_path": str(pm / "chinese-roberta-wwm-ext-large"),
+                                      "cnhuhbert_base_path": str(pm / "chinese-hubert-base")}})
+        self.tts = TTS(conf)
+        voices = REPO / "data" / "voices"
+        self.ref_wav = str(voices / "ref_ja.wav")
+        self.ref_text = (voices / "ref_ja.txt").read_text(encoding="utf-8").strip()
+
+    def available(self) -> bool:
+        return True
+
+    def voices(self) -> list[tuple[str, str]]:
+        return [("", "参照音声（クローン）")]
+
+    def _inputs(self, text: str, speed: float, streaming: bool = False) -> dict:
+        return {"text": text, "text_lang": "ja", "ref_audio_path": self.ref_wav, "prompt_text": self.ref_text,
+                "prompt_lang": "ja", "text_split_method": "cut5", "speed_factor": speed, "seed": 0,
+                "streaming_mode": streaming, "parallel_infer": not streaming}
+
+    def synthesize(self, text: str, voice: str, speed: float = 1.0) -> tuple[np.ndarray, int]:
+        parts, rate = [], 32000
+        for rate, audio in self.tts.run(self._inputs(text, speed)):
+            parts.append(np.asarray(audio))
+        audio = np.concatenate(parts) if parts else np.zeros(0, np.int16)
+        if audio.dtype == np.int16:
+            audio = audio.astype(np.float32) / 32768.0
+        return audio.astype(np.float32), int(rate)
+
+    def synthesize_stream(self, text: str, voice: str = ""):
+        """公式のストリーミング（streaming_mode）。音のかたまりを作れた順に返す。"""
+        for rate, audio in self.tts.run(self._inputs(text, 1.0, streaming=True)):
+            self._rate = int(rate)
+            a = np.asarray(audio)
+            yield (a.astype(np.float32) / 32768.0) if a.dtype == np.int16 else a.astype(np.float32)
+
+    @property
+    def sample_rate(self) -> int:
+        return getattr(self, "_rate", 32000)
+
 
 class Tsukasa:
     """Tsukasa Speech（Respair/Tsukasa_Speech のフォルダーを読み込む。参照音声の声で話す）。"""
@@ -839,6 +948,8 @@ _LOCAL = {"voicevox_core": "VoicevoxCore", "irodori": "Irodori", "supertonic": "
           # ggml の実行系と比べるための元の実装（PyTorch）。モデルは設定の model で選ぶ
           "qwen3-tts-0.6b-base": "Qwen3TTS", "qwen3-tts-0.6b-customvoice": "Qwen3TTS",
           "qwen3-tts-1.7b-base": "Qwen3TTS", "qwen3-tts-1.7b-customvoice": "Qwen3TTS", "omnivoice": "OmniVoiceTTS",
+          "style-bert-vits2": "StyleBertVITS2",
+          "gpt-sovits": "GPTSoVITS",
           "cosyvoice3": "CosyVoice3"}
 
 

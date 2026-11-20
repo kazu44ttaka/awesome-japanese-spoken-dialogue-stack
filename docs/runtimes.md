@@ -120,6 +120,27 @@ export SPEECH_MODEL_DIR=D:/awesome-japanese-speech/models/speechcpp
 `data/voices/ref_ja.txt` を参照音声に使う。Qwen3-TTS の Base は 16 kHz の参照音声を受け付けないので、24 kHz にした
 `ref_ja_24k.wav` を使う。
 
+### ストリーミング
+
+`runtimes/streaming.py` が 3 つの実行系をストリーミングで呼ぶ（測り方は [2026-11-runtimes.md](../benchmarks/2026-11-runtimes.md#ストリーミング)）。
+
+```bash
+.venv/Scripts/python benchmarks/asr/scripts/stream_asr.py --backend audiocpp-nemotron-streaming   # 実時間で送る
+.venv-tts/Scripts/python benchmarks/tts/scripts/stream_tts.py --engine speechcpp-qwen3-tts-0.6b-customvoice
+```
+
+- **audio.cpp**：モデルを `"mode": "streaming"` で登録しないとストリーミングできない（`mode: offline` のままだと
+  エラー）。TTS は `"stream": true, "stream_format": "audio", "response_format": "pcm"` で、ヘッダーなしの int16 の PCM が
+  チャンクで届く。サンプリングレートは応答に無いので、ふつうに 1 回合成した WAV から取る。ASR は
+  `POST /v1/audio/transcriptions/live` にチャンク転送で PCM を送り、SSE で文字が返る（最後に長さ 0 のチャンクを送る）。
+  MioTTS・MOSS-TTS-Local・OuteTTS はストリーミングに対応していない。VoxCPM2 は `retry_badcase: false` が要る
+- **speech.cpp**：TTS は `"response_format": "pcm"` だけでチャンクで届く（`X-Sample-Rate` ヘッダー付き。`"stream"` を
+  付けると 400）。ASR は WebSocket `/v1/realtime`（OpenAI Realtime の形）で、音声は **24 kHz** の PCM を base64 で送る
+- **CrispASR**：TTS は `"stream": true`。逐次に音を出すのは Qwen3-TTS だけで、ほかは 1 文ずつ作ってから送る。
+  ASR は `--ws-port` を付けて立ち上げると開く vLLM Realtime の WebSocket（`/v1/realtime`、16 kHz）で、0.5 秒ごとに
+  それまでの音声全体を認識し直す。0.8.54 ではこの WebSocket が HTTP と **同じ番号** で `0.0.0.0` に開き、HTTP は
+  `127.0.0.1` に開くので、`127.0.0.1` へつなぐと HTTP 側に届いて 404 になる。`127.0.0.2` へつなぐと WebSocket 側に届く
+
 ## 比べるための元の実装（PyTorch）
 
 ggml の実行系の値が、移植で変わっていないかを見るために、同じモデルを公式の実装でも測る。依存がぶつかるので、
@@ -148,6 +169,29 @@ uv pip install --python .venv-cosyvoice/Scripts/python.exe conformer==0.3.2 diff
   漢字のまま渡すと読みが崩れる（CrispASR 版で読みの CER 0.44、カタカナで 0.016）
 - Windows の torchaudio 2.9 以降の `load` は torchcodec（FFmpeg の DLL）を使うので、soundfile で読むように差し替えている
 - ASR の ReazonSpeech NeMo v2 と Parakeet TDT-CTC 0.6B ja は、Haas-ja と同じ `.venv-haas`（NeMo）で動く
+
+ほかの TTS（ggml の実行系には無いが、日本語でよく使われるもの）:
+
+```bash
+# Style-Bert-VITS2（pip 版）。pyopenjtalk-dict が numpy 1 向けなので numpy<2、BERT の型がずれるので transformers<4.50
+uv venv .venv-sbv2 --python 3.11
+uv pip install --python .venv-sbv2/Scripts/python.exe torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+uv pip install --python .venv-sbv2/Scripts/python.exe style-bert-vits2 soundfile "numpy<2" "transformers<4.50" "setuptools<81"
+# GPT-SoVITS（公式リポジトリ）。jieba_fast・pyopenjtalk は公式が配る Windows 用の wheel（コンパイラ不要）を入れる
+git clone --depth 1 https://github.com/RVC-Boss/GPT-SoVITS models/src/GPT-SoVITS
+uv venv .venv-gptsovits --python 3.12
+uv pip install --python .venv-gptsovits/Scripts/python.exe torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+#   https://huggingface.co/lj1995/GPT-SoVITS-windows-package の wheels/cu128/ の jieba_fast と pyopenjtalk、langsegment を入れてから
+#   requirements.txt（先頭の --no-binary=opencc を除く）を入れる。重みは XXXXRT/GPT-SoVITS-Pretrained の pretrained_models
+#   から v2ProPlus に要るもの（chinese-hubert-base・chinese-roberta-wwm-ext-large・fast_langdetect・s1v3.ckpt・sv・
+#   v2Pro/s2Gv2ProPlus.pth）を GPT_SoVITS/pretrained_models へ。Open JTalk の辞書を pyopenjtalk のフォルダーへ展開する
+```
+
+- Style-Bert-VITS2 の声は、公式の例の JVNV コーパス（CC BY-SA 4.0）のモデル `jvnv-F1-jp`。AivisSpeech は同じ系統の
+  モデルを ONNX で動かす
+- GPT-SoVITS は学習なしで、上と同じ参照音声とその書き起こしから声をクローンする（v2ProPlus）
+- ASR の anime-whisper（Kotoba-Whisper v2.0 をアニメ・ゲームの台詞で追加学習）は、transformers・faster-whisper
+  （有志の CTranslate2 変換）・CrispASR（有志の whisper.cpp 変換）の 3 通りで動かす
 
 測定の結果には、読み込み時間（`load_s`）と、GPU のメモリ（読み込む前からの増え方の最大、`gpu_mem_mb`）、RAM
 （測定の処理とサーバーなどの子プロセスの合計の最大、`ram_mb`）も入る（`runtimes/memwatch.py`）。

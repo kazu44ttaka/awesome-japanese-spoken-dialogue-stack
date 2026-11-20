@@ -71,6 +71,8 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("parakeet-tdt-ctc-0.6b-ja", "Parakeet TDT-CTC 0.6B 日本語（NeMo・専用の環境）", "nemo", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
     BackendInfo("kotoba-whisper-v2.0", "Kotoba-Whisper v2.0（transformers）", "transformers", True),
+    BackendInfo("anime-whisper", "anime-whisper（transformers）", "transformers", True),
+    BackendInfo("anime-whisper-faster", "anime-whisper（faster-whisper・CTranslate2 fp16）", "faster-whisper", True),
     BackendInfo("fun-asr-nano", "Fun-ASR-Nano-2512（funasr）", "funasr", True),
     BackendInfo("fun-asr-mlt-nano", "Fun-ASR-MLT-Nano-2512（funasr）", "funasr", True),
 ]}
@@ -640,6 +642,9 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
         "fun-asr-nano": lambda: FunASRNano("FunAudioLLM/Fun-ASR-Nano-2512", device),
         "whisper-large-v3-turbo": lambda: WhisperHF("openai/whisper-large-v3-turbo", device),
         "kotoba-whisper-v2.0": lambda: WhisperHF("kotoba-tech/kotoba-whisper-v2.0", device),
+        # アニメ・ゲームの台詞で追加学習した Kotoba-Whisper v2.0（MIT）。faster-whisper 版は有志の変換
+        "anime-whisper": lambda: WhisperHF("litagin/anime-whisper", device),
+        "anime-whisper-faster": lambda: FasterWhisper("quantumcookie/anime-whisper-ct2-fp16", device, threads),
         "faster-whisper": lambda: FasterWhisper("deepdml/faster-whisper-large-v3-turbo-ct2", device, threads),
         "faster-whisper-sds": lambda: FasterWhisper("RoachLin/kotoba-whisper-v2.2-faster", device, threads, beam_size=5,
                                                     compute_type="int8_float16" if device.startswith("cuda") else "int8",

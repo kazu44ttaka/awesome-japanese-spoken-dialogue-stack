@@ -45,6 +45,9 @@ ASR: dict[str, dict[str, dict]] = {
         # 同じ句をくり返して止まらない発話がある
         "lfm2.5-audio-jp": {"backend": "lfm2-audio",
                             "url": "https://huggingface.co/cstr/lfm2-audio-1.5b-jp-GGUF/resolve/main/lfm2-audio-1.5b-jp-q5_k.gguf"},
+        # anime-whisper の whisper.cpp 向けの変換（有志。変換した人によると先頭に余計な文字が入ることがある）
+        "anime-whisper": {"backend": "whisper",
+                          "url": "https://huggingface.co/Aratako/anime-whisper-ggml/resolve/main/ggml-anime-whisper-q8_0.bin"},
         "whisper-large-v3-turbo": {"backend": "whisper",
                                    "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"},
     },
@@ -119,7 +122,9 @@ TTS: dict[str, dict[str, dict]] = {
         "moss-tts-nano": {"family": "moss_tts_nano", "package": "moss_tts_nano_100m_q8_0", "clone": True, "ref_text": False},
         "moss-tts-local": {"family": "moss_tts_local", "package": "moss_tts_local_v1_5_q8_0", "clone": True, "ref_text": False},
         # IndexTTS2 / 2.5 は日本語に対応していない（同じ音のくり返しになり、読みの CER 0.87〜0.96）ので外した
-        "voxcpm2": {"family": "voxcpm2", "package": "voxcpm2_q8_0", "clone": True},
+        # ストリーミングは失敗した生成のやり直し（retry_badcase）を止めないと動かない
+        "voxcpm2": {"family": "voxcpm2", "package": "voxcpm2_q8_0", "clone": True,
+                    "stream_load": {"default_request_options": {"retry_badcase": False}}},
         "omnivoice": {"family": "omnivoice", "package": "omnivoice_q8_0"},
         "supertonic-3": {"family": "supertonic", "package": "supertonic_3_orig", "voices": ["F1"]},
         "confucius4-tts": {"family": "confucius4_tts", "package": "confucius4_tts_orig", "clone": True, "ref_text": False},

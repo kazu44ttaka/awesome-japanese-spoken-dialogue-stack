@@ -38,7 +38,7 @@ ASR_GROUPS = [
     ("Qwen3-ASR 1.7B ja-anime", [("crispasr-qwen3-asr-1.7b-ja-anime", "", "")]),
     ("Fun-ASR-Nano-2512", [("fun-asr-nano", "funasr（PyTorch）", ""), ("sherpa-funasr-nano", "sherpa-onnx", ""),
                            ("audiocpp-fun-asr-nano", "", ""), ("crispasr-fun-asr-nano", "", "")]),
-    ("Fun-ASR-MLT-Nano-2512", [("fun-asr-mlt-nano", "funasr（PyTorch）", ""), ("crispasr-fun-asr-mlt-nano", "", "3 データとメモリの測定では最初の発話でサーバーが落ちた")]),
+    ("Fun-ASR-MLT-Nano-2512", [("fun-asr-mlt-nano", "funasr（PyTorch）", ""), ("crispasr-fun-asr-mlt-nano", "", "GPU では 2 回目の要求で落ちる（2026-11-20）。3 データは CPU で測った")]),
     ("SenseVoiceSmall", [("sherpa-sensevoice", "sherpa-onnx", ""), ("audiocpp-sensevoice", "", ""),
                          ("crispasr-sensevoice", "", "")]),
     ("Cohere Transcribe", [("sherpa-cohere", "sherpa-onnx（int8）", ""), ("audiocpp-cohere-transcribe", "", ""),
@@ -93,6 +93,9 @@ TTS_GROUPS = [
     ("Fish Audio S2 Pro（クローン）", [("audiocpp-fish-s2-pro", "", "")]),
     ("Higgs Audio TTS 3 4B（クローン）", [("audiocpp-higgs-audio-v3-4b", "", "")]),
     ("OuteTTS 1.0 1B（クローン）", [("audiocpp-outetts-1.0-1b", "", "")]),
+    ("Style-Bert-VITS2 JP-Extra", [("style-bert-vits2", "Style-Bert-VITS2（PyTorch）", "声は jvnv-F1-jp"),
+                                   ("aivisspeech", "AivisSpeech（ONNX）", "同じ系統。声は別のモデル（既定の声）")]),
+    ("GPT-SoVITS v2ProPlus（クローン）", [("gpt-sovits", "GPT-SoVITS（PyTorch）", "")]),
 ]
 
 
@@ -150,8 +153,9 @@ def tts_table() -> str:
     out = []
     for model, rows in TTS_GROUPS:
         out.append(f"### {model}\n")
-        out.append("| 実行系 | 1 文の平均 ms | RTF | 読みの CER | CPU 1 文の平均 ms | 読み込み 秒 | GPU メモリ GB | RAM GB | 注 |")
-        out.append("|---|---:|---:|---:|---:|---:|---:|---:|---|")
+        out.append("| 実行系 | 1 文の平均 ms | 最初の声 ms | RTF | 読みの CER | UTMOS | 話者の近さ | CPU 1 文の平均 ms "
+                   "| 読み込み 秒 | GPU メモリ GB | RAM GB | 注 |")
+        out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
         for name, label, note in rows:
             d = None if name in TTS_CPU_ONLY else load("tts", f"{name}.json")
             c = load("tts", f"{TTS_CPU_NAME.get(name, name + '-cpu')}.json")
@@ -161,16 +165,127 @@ def tts_table() -> str:
                 d_cer = d
             m = load("mem_tts", f"{name}.json")
             rtf = "—" if not d or d.get("rtf") is None else f"{d['rtf']:.3f}"
-            out.append(f"| {runtime_label(name, label)} | {ms(d, 'mean_synth_ms')} | {rtf} | {cer(d_cer)} | "
-                       f"{ms(c, 'mean_synth_ms')} | {load_s(m)} | {mem(m, 'gpu_mem_mb')} | {mem(m, 'ram_mb')} | {note} |")
+            q = load("tts_quality", f"{name}.json") or load("tts_quality", f"{TTS_CPU_NAME.get(name, name)}.json")
+            st = load("tts_stream", f"{name}.json")
+            utmos = "—" if not q else f"{q['mean_utmos']:.2f}"
+            sim = "—" if not q or "クローン" not in model else f"{q['mean_spk_sim']:.2f}"
+            out.append(f"| {runtime_label(name, label)} | {ms(d, 'mean_synth_ms')} | {ms(st, 'p50_first_voice_ms')} | {rtf} | "
+                       f"{cer(d_cer)} | {utmos} | {sim} | {ms(c, 'mean_synth_ms')} | {load_s(m)} | "
+                       f"{mem(m, 'gpu_mem_mb')} | {mem(m, 'ram_mb')} | {note} |")
         out.append("")
     return "\n".join(out)
 
 
+# ストリーミングの ASR（stream_asr.py）。(構成, 実行系の表示, 話し終えてから 1 回で認識したときの構成, 注)
+STREAM_ASR = [
+    ("Nemotron 3.5 ASR streaming 0.6B", [
+        ("nemotron-80ms", "sherpa-onnx（int8・80 ms・CPU）", "", "真のストリーミング"),
+        ("nemotron-560ms", "sherpa-onnx（int8・560 ms・CPU）", "", "真のストリーミング"),
+        ("nemotron-nemo", "NeMo（560 ms・GPU）", "nemotron-nemo", "真のストリーミング"),
+        ("audiocpp-nemotron-streaming", "", "audiocpp-nemotron-streaming", "真のストリーミング"),
+        ("crispasr-nemotron-streaming", "", "crispasr-nemotron-streaming", "0.5 秒ごとに全体を認識し直す")]),
+    ("Voxtral Mini 4B Realtime", [("audiocpp-voxtral-realtime", "", "audiocpp-voxtral-realtime", "80 ms ずつ")]),
+    ("Haas-ja v1.0", [
+        ("audiocpp-haas-ja", "", "audiocpp-haas-ja", "2 秒の窓で認識し直す（右に 2 秒待つ）"),
+        ("speechcpp-haas-ja", "", "speechcpp-haas-ja", "0.2 秒ごとに頭から認識し直す"),
+        ("crispasr-haas-ja", "", "crispasr-haas-ja", "0.5 秒ごとに全体を認識し直す")]),
+    ("ReazonSpeech NeMo v2", [("speechcpp-reazonspeech-nemo-v2", "", "speechcpp-reazonspeech-nemo-v2", "0.2 秒ごとに頭から")]),
+    ("Parakeet TDT-CTC 0.6B ja", [("speechcpp-parakeet-tdt-ctc-0.6b-ja", "", "speechcpp-parakeet-tdt-ctc-0.6b-ja", "0.2 秒ごとに頭から")]),
+    ("Qwen3-ASR 0.6B", [
+        ("audiocpp-qwen3-asr-0.6b", "", "audiocpp-qwen3-asr-0.6b", "既定の 30 秒の窓"),
+        ("speechcpp-qwen3-asr-0.6b", "", "speechcpp-qwen3-asr-0.6b", "0.2 秒ごとに頭から"),
+        ("crispasr-qwen3-asr-0.6b", "", "crispasr-qwen3-asr-0.6b", "0.5 秒ごとに全体を")]),
+    ("SenseVoiceSmall", [
+        ("audiocpp-sensevoice", "", "audiocpp-sensevoice", "窓ごと"),
+        ("crispasr-sensevoice", "", "crispasr-sensevoice", "0.5 秒ごとに全体を")]),
+]
+
+# ストリーミングの TTS。(構成, 実行系の表示, 注)
+STREAM_TTS = [(m, rows) for m, rows in TTS_GROUPS]
+
+
+def stream_asr_table() -> str:
+    out = ["| モデル | 実行系 | 話し終わってから文字が出るまで ms：話しながら送る（中央値 / p95） | 話している途中に文字が出た割合 "
+           "| 読みの CER | 比べる：録音をまとめて渡す ms | 注 |", "|---|---|---:|---:|---:|---:|---|"]
+    for model, rows in STREAM_ASR:
+        for name, label, offline, note in rows:
+            d = load("asr_stream", f"{name}.json")
+            if not d:
+                continue
+            off = load("timing_gpu", f"{offline}.json") if offline else None
+            out.append(f"| {model} | {runtime_label(name, label)} | {d['p50_final_lag_ms']:.0f} / {d['p95_final_lag_ms']:.0f} "
+                       f"| {d['partial_before_end'] * 100:.0f}% | {cer(d)} | {ms(off)} | {note} |")
+    return "\n".join(out) + "\n"
+
+
+# 実行系がサーバーの中でストリーミングする構成の、方式の説明（JSUT の表の「方式」の欄）
+STREAM_HOW = {n: note for _, rows in STREAM_ASR for n, _, _, note in rows}
+
+
+def jsut_asr_table() -> str:
+    """JSUT（音素の時刻付き）で、音素を話し終えてから文字が出るまで。ストリーミングの構成と、デモアプリの疑似
+    ストリーミング（名前の後ろが -app）をすべて並べる。音素から文字が出るまでの中央値の小さい順。"""
+    rows = []
+    d = R / "emission"
+    for p in sorted(d.glob("*.json")) if d.is_dir() else []:
+        e = json.loads(p.read_text(encoding="utf-8"))
+        name = p.stem
+        if "-app" in name:
+            base = name.split("-app")[0]
+            how = "アプリの疑似ストリーミング"
+        else:
+            base, how = name, "ストリーミング：" + STREAM_HOW.get(name, "")
+        label = runtime_label(base, "") if base.split("-", 1)[0] in RT else base
+        rows.append((e["first_p50_ms"], f"| {base} | {label} | {how} | {e['first_p50_ms']} / {e['first_p90_ms']} | "
+                     f"{e['stable_p50_ms']} / {e['stable_p90_ms']} | {e['final_after_speech_p50_ms']} / "
+                     f"{e['final_after_speech_p90_ms']} | {cer(e)} | {e['matched'] * 100:.0f}% |"))
+    out = ["| 構成 | 実行系 | 方式 | 音素から文字が出るまで ms（中央値 / p90） | 書き換わらなくなるまで ms（中央値 / p90） "
+           "| 話し終わってから文字が出るまで ms（中央値 / p90） | 読みの CER | 対応がついた音素 |",
+           "|---|---|---|---:|---:|---:|---:|---:|"]
+    out += [r for _, r in sorted(rows)]
+    return "\n".join(out) + "\n"
+
+
+def stream_tts_table() -> str:
+    out = ["| モデル | 実行系 | 最初の音 ms（中央値） | 最初の声 ms（中央値 / 平均） | 全部届くまで ms（平均） "
+           "| 比べる：ストリーミングなし ms | 注 |", "|---|---|---:|---:|---:|---:|---|"]
+    for model, rows in STREAM_TTS:
+        for name, label, note in rows:
+            d = load("tts_stream", f"{name}.json")
+            if not d:
+                continue
+            off = load("tts", f"{name}.json")
+            out.append(f"| {model} | {runtime_label(name, label)} | {ms(d, 'p50_first_chunk_ms')} | "
+                       f"{ms(d, 'p50_first_voice_ms')} / {ms(d, 'mean_first_voice_ms')} | {ms(d, 'mean_total_ms')} | "
+                       f"{ms(off, 'mean_synth_ms')} | {note} |")
+    return "\n".join(out) + "\n"
+
+
+LLM_RT = {"lmstudio": "LM Studio", "llamacpp-cuda": "llama.cpp（CUDA）", "llamacpp-vulkan": "llama.cpp（Vulkan）"}
+
+
+def llm_table() -> str:
+    out = ["| モデル | 実行系 | TTFT 中央値 / 最悪 ms | tok/s 短い返事 | tok/s 長めの返事 |", "|---|---|---:|---:|---:|"]
+    files = sorted(R.joinpath("llm_rt").glob("*.json")) if R.joinpath("llm_rt").is_dir() else []
+    models = list(dict.fromkeys(f.stem.split("__")[0] for f in files))
+    for m in models:
+        for rt, label in LLM_RT.items():
+            d = load("llm_rt", f"{m}__{rt}.json")
+            if not d:
+                continue
+            f = lambda k: "—" if d.get(k) is None else f"{d[k]:.0f}"  # noqa: E731
+            out.append(f"| {m} | {label} | {f('ttft_median_ms')} / {f('ttft_worst_ms')} | {f('tok_s_median')} | "
+                       f"{f('tok_s_long_median')} |")
+    return "\n".join(out) + "\n"
+
+
 def main() -> None:
     text = PAGE.read_text(encoding="utf-8")
-    for tag, body in (("asr", asr_table()), ("tts", tts_table())):
+    for tag, body in (("asr", asr_table()), ("tts", tts_table()), ("stream-asr", stream_asr_table()), ("jsut-asr", jsut_asr_table()),
+                      ("stream-tts", stream_tts_table()), ("llm", llm_table())):
         start, end = f"<!-- {tag}-tables:start -->", f"<!-- {tag}-tables:end -->"
+        if start not in text:
+            continue
         head, rest = text.split(start, 1)
         _, tail = rest.split(end, 1)
         text = f"{head}{start}\n{body}\n{end}{tail}"

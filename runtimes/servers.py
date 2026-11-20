@@ -298,8 +298,9 @@ def to_kana(text: str) -> str:
     return pyopenjtalk.g2p(text, kana=True)
 
 
-def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -> OpenAITTS:
-    """runtimes/catalog.py の TTS の構成を立ち上げる。spec["clone"] が真なら参照音声（REF_WAV）で声をクローンする。"""
+def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8, mode: str = "offline") -> OpenAITTS:
+    """runtimes/catalog.py の TTS の構成を立ち上げる。spec["clone"] が真なら参照音声（REF_WAV）で声をクローンする。
+    mode="streaming" は audio.cpp でストリーミングできるように登録する（runtimes/streaming.py）。"""
     from runtimes.catalog import TTS
 
     spec = TTS[runtime][key]
@@ -324,8 +325,10 @@ def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8) -
     elif runtime == "audiocpp":
         path = audiocpp_install(spec["package"])
         model = key
-        entry = {"id": key, "family": spec["family"], "path": str(path), "task": "tts", "mode": "offline",
+        entry = {"id": key, "family": spec["family"], "path": str(path), "task": "tts", "mode": mode,
                  **spec.get("load", {})}
+        if mode == "streaming":  # ストリーミングのときだけ要る設定（VoxCPM2 の retry_badcase=false など）
+            entry.update(spec.get("stream_load", {}))
         if spec.get("session_packages"):  # 別パッケージのモデル（コーデックなど）の場所
             entry["session_options"] = {k: str(audiocpp_install(v)) for k, v in spec["session_packages"].items()}
         server, url = start_audiocpp([entry], device, threads)

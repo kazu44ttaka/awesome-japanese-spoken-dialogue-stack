@@ -114,3 +114,14 @@ python = ".venv-cosyvoice/Scripts/python.exe"
 root = "models/src/CosyVoice"
 kana = true  # 日本語はカタカナで渡す（公式の例のとおり）
 hf_cache = "models/hf"
+
+["style-bert-vits2"]
+python = ".venv-sbv2/Scripts/python.exe"
+hf_cache = "models/hf"
+voice = "jvnv-F1-jp"
+
+["gpt-sovits"]
+python = ".venv-gptsovits/Scripts/python.exe"
+hf_cache = "models/hf"
+root = "models/src/GPT-SoVITS"
+version = "v2ProPlus"
