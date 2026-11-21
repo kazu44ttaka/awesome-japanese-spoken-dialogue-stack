@@ -1,20 +1,26 @@
-# awesome-japanese-spoken-dialogue-stack
+# Awesome Japanese Spoken Dialogue Stack [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
 
-A curated list of components for building Japanese spoken dialogue systems: **speech recognition (ASR), speech synthesis (TTS) and LLMs**, plus the models around them (voice activity detection, turn-taking, backchannels).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue systems, with speed and accuracy measured per runtime on the same machine.
 
 [日本語](README.md)
 
-- Focused on models you can run locally, with **Japanese support, streaming, license (commercial use) and runtime** side by side.
-- **Compare the same model across runtimes.** The original implementation (PyTorch etc.), sherpa-onnx, faster-whisper and the ggml-based CrispASR, audio.cpp and speech.cpp,
-  measured for speed, accuracy and memory on the same machine ([runtime comparison](benchmarks/2026-11-runtimes.md), Japanese). The same model can be several times faster, or less accurate, depending on the runtime.
-- **Broad coverage**: most of the main ASR and TTS models usable for Japanese have **numbers measured on the same machine under the same conditions** (character error rate, latency, RTF, memory) together with the scripts, in [benchmarks/](benchmarks/).
-- Written with spoken dialogue systems in mind, so **latency matters as much as accuracy**.
+- **List**: Japanese support, streaming, license and runtimes for each model.
+- **Runtime comparison**: the same model run with its original implementation, sherpa-onnx, CrispASR, audio.cpp and speech.cpp, measured for speed, accuracy and memory. The same model can be several times faster depending on the runtime.
+- **Latency too**: time from the end of speech to the text, and time to the first audio, which matter in spoken dialogue.
 
-> Licenses were checked against each official page (model card, repository and license text) on 2026-11-21. They can change, so always check the official page before use. "conditional" means commercial use is allowed under conditions such as a revenue cap; "unknown" means no license is stated.
-> The "Commercial" column is a hint, not legal advice.
+## Latest updates
+
+- **2026-11-21** Added ASR on free two-person conversation, streaming latency, TTS naturalness (UTMOS) and LLM runtimes. Fixed how numerals are scored and rescored every result. Checked every model license.
+- **2026-11-18** Added a [page](benchmarks/2026-11-runtimes.md) comparing the same model across runtimes.
+- **2026-11-17** Added CrispASR, audio.cpp and speech.cpp as runtimes; ASR latency measured separately on GPU and CPU.
+
+[Full changelog](CHANGELOG.md)
 
 ## Contents
 
+- [Quick picks](#quick-picks)
 - [ASR](#asr)
 - [TTS](#tts)
 - [LLM](#llm)
@@ -22,10 +28,28 @@ A curated list of components for building Japanese spoken dialogue systems: **sp
 - [Try it](#try-it)
 - [Benchmarks](#benchmarks)
 - [Contributing](#contributing)
+- [License](#license)
+
+## Quick picks
+
+First choices based on our measurements. Check the license column below before commercial use.
+
+| Goal | Pick | Why |
+|---|---|---|
+| Fast, accurate ASR on GPU | Haas-ja v1.0, Parakeet TDT-CTC 0.6B ja | ~40 ms per utterance; Haas has the best average rank on our three test sets ([ASR accuracy](benchmarks/asr/2026-11-3sets.md)) |
+| ASR on CPU only | ReazonSpeech k2-v2 | ~90 ms per utterance, CER 0.024-0.036 ([latency](benchmarks/asr/2026-11-timing.md)) |
+| Casual conversation | Qwen3-ASR 1.7B (speech.cpp) | Best CER on free two-person conversation (0.091) ([conversation](benchmarks/asr/2026-11-3sets.md#会話magichub-の自由会話)) |
+| Text while the user is still speaking | Pseudo-streaming Parakeet TDT-CTC or Haas-ja | Text appears ~60-130 ms after each phoneme; true-streaming Nemotron takes 0.5-0.8 s ([streaming](benchmarks/2026-11-runtimes.md#ストリーミング)) |
+| Fast TTS | VOICEVOX (voicevox_core), Supertonic 3 (audio.cpp) | ~50 ms and ~90 ms per sentence on GPU ([TTS](benchmarks/tts/2026-11-tts.md)) |
+| Voice cloning | Qwen3-TTS (audio.cpp, speech.cpp) | ~0.6 s per sentence, 32-92 ms to first audio when streaming ([runtimes](benchmarks/2026-11-runtimes.md)) |
+| Voice from a text description | Irodori-TTS v4.1 (audio.cpp) | ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
+| Fast first reply from the LLM | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms and 45 ms to the first token ([LLM](benchmarks/llm/2026-11-lmstudio.md)) |
+
+**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The benchmark pages are in Japanese.
 
 ## ASR
 
-"Streaming: yes" means text appears while the user is still speaking; "pseudo" means short chunks are re-recognized each time.
+"Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
 
 <!-- table:asr -->
 
@@ -35,18 +59,13 @@ A curated list of components for building Japanese spoken dialogue systems: **sp
 
 ## TTS
 
-"Streaming: yes" means audio can start before the whole sentence is synthesized.
+"Streaming" yes means audio can start before the whole sentence is synthesised.
 
 <!-- table:tts -->
 
 ## LLM
 
-For Japanese knowledge and reasoning, see the existing leaderboards:
-
-- [Nejumi LLM Leaderboard](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA)
-- [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html)
-
-We measure what matters for dialogue — **time to first token and tokens per second** — on a local GPU ([benchmarks/llm/2026-11-lmstudio.md](benchmarks/llm/2026-11-lmstudio.md)).
+For knowledge and reasoning in Japanese, see the [Nejumi LLM Leaderboard](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA) and the [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html). Here we measure what matters in spoken dialogue: time to the first token and generation speed.
 
 <!-- table:llm -->
 
@@ -56,34 +75,20 @@ We measure what matters for dialogue — **time to first token and tokens per se
 
 ## Try it
 
-- **Minimal inference examples**: [examples/asr/](examples/asr/) — one standalone script per model that transcribes a WAV file
-- **Microphone demo app**: [apps/asr_demo.py](apps/asr_demo.py) (PySide6) and [apps/asr_web.py](apps/asr_web.py) (browser) — pick a model and speak; utterances are segmented with Silero VAD and finalized, with optional interim results (pseudo-streaming). Shows recognition time and the delay from the end of speech to the text. Nemotron 3.5 streaming runs as true streaming (incremental input with carried-over state)
-- **TTS demo app**: [apps/tts_demo.py](apps/tts_demo.py) (PySide6) and [apps/tts_web.py](apps/tts_web.py) (browser) — pick an engine (AivisSpeech, VOICEVOX, VOICEVOX Core, Irodori-TTS, Supertonic 3, mio-tts-cpp, Qwen3-TTS, Tsukasa, Kokoro, ZONOS3-Mini, Kitten TTS 2, LFM2.5-Audio, MOSS-TTS-Nano) and a voice and read text aloud. "Synthesize per sentence and play as soon as each is ready" shows the time to first audio, which is what matters in dialogue. AivisSpeech / VOICEVOX can be launched from the app if installed. Setup: [apps/README.md](apps/README.md)
-
-```
-uv venv --python 3.11 .venv
-uv pip install sherpa-onnx sounddevice soundfile numpy
-uv pip install torch --index-url https://download.pytorch.org/whl/cu128
-uv pip install --no-deps "silero-vad==6.2.1"               # voice activity detection (same as MaAI-SDS)
-uv pip install "transformers>=5.16" funasr                 # for transformers / funasr models
-uv pip install "pyside6-essentials==6.12.0" fastapi "uvicorn[standard]"   # desktop UI (PySide6) and web version
-python apps/asr_demo.py      # web version: python apps/asr_web.py (http://127.0.0.1:8765)
-.venv-tts/Scripts/python apps/tts_demo.py   # TTS uses its own environment (apps/README.md); web version: apps/tts_web.py
-```
+- [examples/asr/](examples/asr/) - Minimal per-model scripts that transcribe one WAV file.
+- [apps/](apps/README.md) - An ASR app that recognises your microphone and a TTS app that reads text with a chosen engine and voice (desktop and browser versions), with install steps.
 
 ## Benchmarks
 
-| Target | What | Results |
-|---|---|---|
-| ASR, TTS | The same model on different runtimes (original implementation, sherpa-onnx, CrispASR, audio.cpp, speech.cpp, ...): speed, accuracy and memory (18 ASR and 22 TTS models) | [2026-11 (runtimes)](benchmarks/2026-11-runtimes.md) (Japanese) |
-| ASR | Reading-based CER on three public test sets (FLEURS, ReazonSpeech, Common Voice; 23 configurations) | [2026-11 (three test sets)](benchmarks/asr/2026-11-3sets.md) (Japanese) |
-| ASR | Per-utterance latency on the same 100 utterances, measured separately on GPU and CPU (8 threads) | [2026-11 (latency)](benchmarks/asr/2026-11-timing.md) (Japanese) |
-| ASR | Character error rate (CER) and per-utterance latency on 20 JSUT utterances | [2026-08](benchmarks/asr/2026-08-jsut20.md), [2026-11 (new models, CER without punctuation)](benchmarks/asr/2026-11-jsut20.md) (Japanese) |
-| TTS | Synthesis time and RTF on 20 short-to-long sentences, plus reading-based CER from three ASR models (9 engines in 18 configurations, GPU and CPU separately) | [2026-11](benchmarks/tts/2026-11-tts.md) (Japanese) |
-| TTS | Long-text RTF (synthesis time / audio length), memory, ASR round-trip check | [2026-08](benchmarks/tts/2026-08-19.md) (Japanese) |
-| LLM | Time to first token and tokens/s for dialogue replies (LM Studio, 10 models) | [2026-11](benchmarks/llm/2026-11-lmstudio.md) (Japanese) |
+| What | Page |
+|---|---|
+| Speed, accuracy and memory of the same model across runtimes, streaming latency, TTS naturalness, LLM runtimes | [Runtime comparison](benchmarks/2026-11-runtimes.md) |
+| ASR accuracy (FLEURS, ReazonSpeech, Common Voice, free conversation) | [ASR accuracy](benchmarks/asr/2026-11-3sets.md) |
+| ASR latency (the same 100 utterances on GPU and CPU) | [ASR latency](benchmarks/asr/2026-11-timing.md) |
+| TTS synthesis time and reading accuracy (20 sentences) | [TTS](benchmarks/tts/2026-11-tts.md) |
+| LLM reply latency (LM Studio) | [LLM](benchmarks/llm/2026-11-lmstudio.md) |
 
-Method and test machine: [benchmarks/README.md](benchmarks/README.md).
+Methods, the test machine and earlier results are in [benchmarks/README.md](benchmarks/README.md).
 
 ## Contributing
 
@@ -91,8 +96,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The tables are generated from `data/mode
 
 ## License
 
-This repository (the list, benchmark results and code) is MIT-licensed ([LICENSE](LICENSE)). The listed models and datasets follow their own licenses.
+This repository (the list, benchmark results and code) is [MIT](LICENSE). The listed models and datasets follow their own licenses.
 
-## Related
+## Footnotes
 
-- [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) — a spoken dialogue system where many of these models are integrated and tested
+- Licenses were checked against each official page (model card, repository and license text) on 2026-11-21. They can change, so check the official page before use. The commercial column is a guide, not legal advice. "conditional" means commercial use is allowed under conditions such as a revenue cap; "unknown" means no license is stated.
+- Related: [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) - A spoken dialogue system where many of these models are integrated and tested.
