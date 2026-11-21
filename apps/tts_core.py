@@ -45,6 +45,12 @@ DEVICE_SPECS: dict[str, dict] = {
     "kitten": {"label": "Kitten Device", "choices": ["cuda", "cpu"], "default": "cuda"},
     "moss_nano": {"label": "MOSS-TTS-Nano Device", "choices": ["cuda", "cpu"], "default": "cpu"},
 }
+# ggml 系の実行系の構成（crispasr-* / audiocpp-* / speechcpp-*）は GPU と CPU を選べる（speech.cpp の GPU は Vulkan）
+for _name in BACKENDS:
+    _runtime = _name.partition("-")[0]
+    if _runtime in ("crispasr", "audiocpp", "speechcpp"):
+        DEVICE_SPECS[_name] = {"label": "Device（speech.cpp の cuda は Vulkan）" if _runtime == "speechcpp" else "Device",
+                               "choices": ["cuda", "cpu"], "default": "cuda"}
 DEVICE_CHOICES = {k: v["choices"] for k, v in DEVICE_SPECS.items()}
 FIXED_DEVICE: dict[str, str] = {
     "supertonic": "CPU",
@@ -56,6 +62,9 @@ FIXED_DEVICE: dict[str, str] = {
     "qwen3-tts": "GPU",
     "tsukasa": "GPU",
     "kokoro": "既定",
+    **{n: "GPU（tts_engines.toml の device）" for n in ("qwen3-tts-0.6b-base", "qwen3-tts-0.6b-customvoice", "qwen3-tts-1.7b-base",
+                                                     "qwen3-tts-1.7b-customvoice", "omnivoice", "cosyvoice3",
+                                                     "style-bert-vits2", "gpt-sovits")},
 }
 
 STATE_LABELS = {"stopped": "停止", "starting": "起動中", "running": "稼働", "error": "異常"}

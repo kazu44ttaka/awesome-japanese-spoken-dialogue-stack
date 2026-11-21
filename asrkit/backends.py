@@ -78,6 +78,21 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
 ]}
 
 
+def _add_runtime_backends() -> None:
+    """ggml 系の実行系（CrispASR・audio.cpp・speech.cpp）の構成を、測定と同じ一覧（runtimes/catalog.py）から足す。"""
+    try:
+        from runtimes.catalog import APP_STREAMING_ASR, ASR, label
+    except ImportError:  # リポジトリの外から asrkit だけを使うとき
+        return
+    for runtime, models in ASR.items():
+        for key, spec in models.items():
+            name = f"{runtime}-{key}"
+            BACKENDS[name] = BackendInfo(name, label(runtime, key, spec), runtime, True, name in APP_STREAMING_ASR)
+
+
+_add_runtime_backends()
+
+
 class GraniteCTC:
     """IBM Granite Speech 5.0 TurboCTC（transformers>=5.16、AutoModelForCTC）。"""
 
@@ -613,9 +628,58 @@ class NemotronStreaming:
         return self.finish()
 
 
+class RuntimeStreaming:
+    """ggml 系の実行系のストリーミング（runtimes/streaming.py）を、アプリの真のストリーミングと同じ形
+    （start / feed / finish、.stream、audio → text）で使う。実行系のサーバーは自動で立ち上げ、close で止める。"""
+
+    FINISH_TIMEOUT = 10.0  # 確定の文字が返らないときは、最後の途中経過を確定にする
+
+    def __init__(self, runtime: str, key: str, device: str = "cuda", threads: int = 4) -> None:
+        from runtimes.streaming import create_stream_asr
+
+        self.inner = create_stream_asr(runtime, key, device=device, threads=threads)
+        self.device = getattr(self.inner, "device", device)
+        self.stream = None
+
+    def _latest(self) -> str:
+        return self.inner.events[-1][1] if self.inner.events else ""
+
+    def start(self) -> None:
+        self.inner.start()
+        self.stream = True
+
+    def feed(self, audio: np.ndarray) -> str:
+        self.inner.feed(np.ascontiguousarray(audio, dtype=np.float32))
+        return self._latest()
+
+    def finish(self) -> str:
+        try:
+            return self.inner.finish(self.FINISH_TIMEOUT)
+        except TimeoutError:
+            return self._latest()
+        finally:
+            self.stream = None
+
+    def __call__(self, audio: np.ndarray) -> str:
+        """区間全体を一度に認識する（ウォームアップ用）。0.1 秒ずつ送る。"""
+        self.start()
+        for i in range(0, len(audio), RATE_16K // 10):
+            self.feed(audio[i:i + RATE_16K // 10])
+        return self.finish()
+
+    def close(self) -> None:
+        self.inner.close()
+
+
+RATE_16K = 16000
+
+
 def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None, config: dict | None = None,
                      device: str = "cpu"):
     """真のストリーミングのモデルを作る。device="cuda" は CUDA 版の sherpa-onnx のときだけ GPU になる。"""
+    runtime, _, key = name.partition("-")
+    if runtime in ("crispasr", "speechcpp", "audiocpp"):
+        return RuntimeStreaming(runtime, key, device, threads)
     if name == "nemotron-nemo":
         cfg = dict((config if config is not None else load_config()).get("nemotron_nemo", {}))
         return NemoNemotron(cfg)

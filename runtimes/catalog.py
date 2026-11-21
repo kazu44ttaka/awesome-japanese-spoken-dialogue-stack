@@ -134,3 +134,36 @@ TTS: dict[str, dict[str, dict]] = {
         "outetts-1.0-1b": {"family": "outetts", "package": "outetts_1_0_1b_q8_0", "clone": True},
     },
 }
+
+# アプリ（apps/）の一覧に出す名前
+RUNTIME_LABELS = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp・Vulkan"}
+MODEL_LABELS = {
+    # ASR
+    "haas-ja": "Haas-ja v1.0", "reazonspeech-nemo-v2": "ReazonSpeech NeMo v2",
+    "parakeet-tdt-ctc-0.6b-ja": "Parakeet TDT-CTC 0.6B ja", "parakeet-ctc-1.1b-ja": "Parakeet CTC 1.1B ja",
+    "qwen3-asr-0.6b": "Qwen3-ASR 0.6B", "qwen3-asr-1.7b": "Qwen3-ASR 1.7B", "qwen3-asr-1.7b-ja-anime": "Qwen3-ASR 1.7B ja-anime",
+    "fun-asr-nano": "Fun-ASR-Nano-2512", "fun-asr-mlt-nano": "Fun-ASR-MLT-Nano-2512", "sensevoice": "SenseVoiceSmall",
+    "cohere-transcribe": "Cohere Transcribe", "cohere-asr-ja-v0.1": "Cohere ASR ja v0.1",
+    "granite-4.0-1b": "Granite 4.0 1B Speech", "granite-4.1-2b": "Granite Speech 4.1 2B",
+    "voxtral-realtime": "Voxtral Mini 4B Realtime", "nemotron-streaming": "Nemotron 3.5 streaming 0.6B",
+    "vibevoice-asr": "VibeVoice-ASR", "lfm2.5-audio-jp": "LFM2.5-Audio-1.5B-JP", "anime-whisper": "anime-whisper",
+    "whisper-large-v3-turbo": "Whisper large-v3-turbo",
+    # TTS
+    "qwen3-tts-0.6b-base": "Qwen3-TTS 0.6B Base", "qwen3-tts-0.6b-customvoice": "Qwen3-TTS 0.6B CustomVoice",
+    "qwen3-tts-1.7b-base": "Qwen3-TTS 1.7B Base", "qwen3-tts-1.7b-customvoice": "Qwen3-TTS 1.7B CustomVoice",
+    "miotts-0.6b": "MioTTS 0.6B", "miotts-1.7b": "MioTTS 1.7B", "moss-tts-local": "MOSS-TTS-Local v1.5",
+    "moss-tts-nano": "MOSS-TTS-Nano", "voxcpm2": "VoxCPM2", "omnivoice": "OmniVoice", "supertonic-3": "Supertonic 3",
+    "cosyvoice3": "CosyVoice3 0.5B", "confucius4-tts": "Confucius4-TTS", "irodori-tts-500m-v3": "Irodori-TTS 500M v3",
+    "irodori-tts-600m-v3-voicedesign": "Irodori-TTS 600M v3 VoiceDesign", "irodori-tts-v4-small": "Irodori-TTS v4 Small",
+    "irodori-tts-v4-small-mf": "Irodori-TTS v4.1 Small MF", "irodori-tts-v4-anime": "Irodori-TTS v4.1 Anime",
+    "irodori-tts-large": "Irodori-TTS Large", "fish-s2-pro": "Fish Audio S2 Pro", "higgs-audio-v3-4b": "Higgs Audio TTS 3 4B",
+    "outetts-1.0-1b": "OuteTTS 1.0 1B",
+}
+# 実行系のストリーミングをアプリの真のストリーミングとして使う構成（ほかはアプリの疑似ストリーミングで動かす）
+APP_STREAMING_ASR = {"audiocpp-nemotron-streaming", "audiocpp-voxtral-realtime", "crispasr-nemotron-streaming"}
+
+
+def label(runtime: str, key: str, spec: dict | None = None) -> str:
+    """アプリの一覧に出す名前。例: Haas-ja v1.0（speech.cpp・Vulkan）、Qwen3-TTS 0.6B Base（audio.cpp・クローン）"""
+    extra = "・クローン" if spec and spec.get("clone") else ""
+    return f"{MODEL_LABELS.get(key, key)}（{RUNTIME_LABELS.get(runtime, runtime)}{extra}）"

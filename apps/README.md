@@ -8,6 +8,7 @@
 - `*_demo.py` はデスクトップのアプリ（PySide6。[MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) と同じ `pyside6-essentials==6.12.0`）。マイクと再生はこの PC の sounddevice
 - `*_web.py` はブラウザで使う版（FastAPI + uvicorn）。マイクと再生はブラウザで、認識・合成はこの PC で行う。起動するとブラウザが開く（ASR は http://127.0.0.1:8765 、TTS は http://127.0.0.1:8766 ）
 - 中身は共通（[asr_core.py](asr_core.py)・[tts_core.py](tts_core.py)）なので、どちらでも同じモデル・同じ設定で動く
+- ベンチマークで測った構成は全部選べる（ASR 62・TTS 59）。ggml 系の実行系（CrispASR・audio.cpp・speech.cpp）の構成は名前に実行系が付き（例「Haas-ja v1.0（speech.cpp・Vulkan）」）、実行系を [docs/runtimes.md](../docs/runtimes.md) の手順で入れておけば、「起動」でサーバーを立ち上げ「停止」で止める。audio.cpp と CrispASR の Nemotron・Voxtral は真のストリーミング、ほかはアプリの疑似ストリーミングで動く。声を真似る TTS は参照音声に `data/voices/ref_ja.wav` を使う
 - ブラウザのマイクは安全な接続でしか使えない。この PC で開く（127.0.0.1 / localhost）なら使えるが、`--host 0.0.0.0` でほかの PC から開くときは HTTPS が要る（TTS の再生はそのまま使える）
 - Web 版を同時に使えるのは 1 つのページだけ（あとから開いたページが引き継ぐ）
 - 使い方：モデル（エンジン）とデバイスを選んで「起動」し、状態が「稼働」になったら使う。「停止」で閉じる。AivisSpeech / VOICEVOX は、動いていなければ「起動」で立ち上げる

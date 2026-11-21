@@ -137,7 +137,7 @@ For knowledge and reasoning in Japanese, see the [Nejumi LLM Leaderboard](https:
 ## Try it
 
 - [examples/asr/](examples/asr/) - Minimal per-model scripts that transcribe one WAV file.
-- [apps/](apps/README.md) - An ASR app that recognises your microphone and a TTS app that reads text with a chosen engine and voice (desktop and browser versions), with install steps.
+- [apps/](apps/README.md) - An ASR app that recognises your microphone and a TTS app that reads text with a chosen engine and voice (desktop and browser versions). Every benchmarked configuration, including each runtime, can be selected. Install steps are there too.
 
 ## Benchmarks
 

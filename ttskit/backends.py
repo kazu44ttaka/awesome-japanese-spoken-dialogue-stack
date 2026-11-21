@@ -55,7 +55,32 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("kitten", "Kitten TTS 2（別の環境）", "pip install kittenml（別の環境 .venv-kitten）。商用は登録が要る"),
     BackendInfo("lfm_audio", "LFM2.5-Audio-1.5B-JP（別の環境・GPU）", "pip install liquid-audio（別の環境 .venv-lfm）"),
     BackendInfo("moss_nano", "MOSS-TTS-Nano 0.1B（別の環境・CPU）", "MOSS-TTS-Nano を clone して入れる（別の環境 .venv-nano）"),
+    # ggml の実行系と比べるための元の実装（docs/runtimes.md の「比べるための元の実装」）
+    BackendInfo("qwen3-tts-0.6b-base", "Qwen3-TTS 0.6B Base（PyTorch・クローン・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("qwen3-tts-0.6b-customvoice", "Qwen3-TTS 0.6B CustomVoice（PyTorch・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("qwen3-tts-1.7b-base", "Qwen3-TTS 1.7B Base（PyTorch・クローン・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("qwen3-tts-1.7b-customvoice", "Qwen3-TTS 1.7B CustomVoice（PyTorch・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("omnivoice", "OmniVoice（PyTorch・クローン・別の環境）", "omnivoice を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("cosyvoice3", "CosyVoice3 0.5B（PyTorch・クローン・別の環境）", "公式リポジトリを別の環境に入れる。日本語はカタカナに直して渡す（kana = true）"),
+    BackendInfo("style-bert-vits2", "Style-Bert-VITS2（PyTorch・別の環境）", "style-bert-vits2 を別の環境に入れ、tts_engines.toml の python に書く"),
+    BackendInfo("gpt-sovits", "GPT-SoVITS v2ProPlus（PyTorch・クローン・別の環境）", "公式リポジトリを別の環境に入れる（docs/runtimes.md）"),
 ]}
+
+
+def _add_runtime_backends() -> None:
+    """ggml 系の実行系（CrispASR・audio.cpp・speech.cpp）の構成を、測定と同じ一覧（runtimes/catalog.py）から足す。"""
+    try:
+        from runtimes.catalog import TTS, label
+    except ImportError:  # リポジトリの外から ttskit だけを使うとき
+        return
+    note = "実行系を入れておく（docs/runtimes.md）。サーバーは自動で立ち上げる。クローンの参照音声は data/voices/ref_ja.wav"
+    for runtime, models in TTS.items():
+        for key, spec in models.items():
+            name = f"{runtime}-{key}"
+            BACKENDS[name] = BackendInfo(name, label(runtime, key, spec), note)
+
+
+_add_runtime_backends()
 
 
 def load_config(path: Path | None = None) -> dict:
