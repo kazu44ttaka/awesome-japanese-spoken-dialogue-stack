@@ -185,11 +185,12 @@ class MainWindow(QMainWindow):
         return next(m for m in self.models if m["name"] == self.model_combo.currentData())
 
     def _sync_device(self) -> None:
-        gpu = self._model()["gpu"]
-        if not gpu:
-            self.device_combo.setCurrentText("cpu")
-        self.device_combo.setEnabled(gpu)
-        self.device_combo.setToolTip("" if gpu else "このモデルは CPU で動かす")
+        m = self._model()
+        fixed = None if m["gpu"] and m["cpu"] else ("cpu" if not m["gpu"] else "cuda")
+        if fixed:
+            self.device_combo.setCurrentText(fixed)
+        self.device_combo.setEnabled(fixed is None)
+        self.device_combo.setToolTip({None: "", "cpu": "このモデルは CPU で動かす", "cuda": "このモデルは GPU でしか動かない"}[fixed])
 
     def _on_model_changed(self, _index: int) -> None:
         """MaAI-SDS と同じく、ASRエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で読み込む）。"""

@@ -132,8 +132,9 @@ function syncButtons() {
 function syncDevice() {
   const m = models.find((x) => x.name === $('model').value);
   if (!m) return;
-  if (!m.gpu) $('device').value = 'cpu';
-  $('device').disabled = !m.gpu;
+  const fixed = m.gpu && m.cpu ? null : (m.gpu ? 'cuda' : 'cpu');  // CPU だけ・GPU だけのモデルは固定する
+  if (fixed) $('device').value = fixed;
+  $('device').disabled = !!fixed;
 }
 function setOptions(o) {
   $('pseudo').checked = !!o.pseudo;

@@ -86,7 +86,7 @@ _RUNTIME_GROUP = {"sherpa-onnx": "sherpa-onnx", "crispasr": "CrispASR", "audiocp
 
 def model_choices() -> list[dict]:
     """[{name, label, gpu, streaming, group}]。GUI と Web のモデルの一覧（実行系ごとにまとめた順）。"""
-    items = [{"name": b.name, "label": b.label, "gpu": b.gpu, "streaming": b.streaming,
+    items = [{"name": b.name, "label": b.label, "gpu": b.gpu, "cpu": b.cpu, "streaming": b.streaming,
               "group": _RUNTIME_GROUP.get(b.runtime, MODEL_GROUPS[0])} for b in BACKENDS.values()]
     return sorted(items, key=lambda m: MODEL_GROUPS.index(m["group"]))
 
@@ -171,6 +171,8 @@ class AsrSession:
             return
         if not BACKENDS[name].gpu:
             device = "cpu"
+        elif not BACKENDS[name].cpu:
+            device = "cuda"
         self.stop()
         self._set_state("starting", f"{BACKENDS[name].label} を読み込み中…（初回はダウンロードに時間がかかります）")
 
