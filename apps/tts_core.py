@@ -81,15 +81,29 @@ SAMPLES = {
 Emit = Callable[..., None]
 
 
+# 一覧は実行系ごとにまとめて出す（この順）
+ENGINE_GROUPS = ["エンジン・元の実装", "CrispASR", "audio.cpp", "speech.cpp（Vulkan）"]
+_PREFIX_GROUP = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp（Vulkan）"}
+_AUDIOCPP_ENGINES = {"supertonic_cpp", "qwen3_tts_cpp"}  # audio.cpp のサーバーを MaAI-SDS と同じ設定で動かすもの
+
+
+def _engine_group(name: str) -> str:
+    if name in _AUDIOCPP_ENGINES:
+        return "audio.cpp"
+    return _PREFIX_GROUP.get(name.partition("-")[0], ENGINE_GROUPS[0])
+
+
 def engine_choices() -> list[dict]:
-    """[{name, label, note, http, device_label, devices, default_device, fixed_device}]。GUI と Web のエンジンの一覧。"""
+    """[{name, label, note, http, device_label, devices, default_device, fixed_device, group}]。
+    GUI と Web のエンジンの一覧（実行系ごとにまとめた順）。"""
     out = []
     for b in BACKENDS.values():
         spec = DEVICE_SPECS.get(b.name, {})
         out.append({"name": b.name, "label": b.label, "note": b.note, "http": b.name in HTTP_ENGINES,
                     "device_label": spec.get("label", "Device"), "devices": spec.get("choices", []),
-                    "default_device": spec.get("default"), "fixed_device": FIXED_DEVICE.get(b.name, "既定")})
-    return out
+                    "default_device": spec.get("default"), "fixed_device": FIXED_DEVICE.get(b.name, "既定"),
+                    "group": _engine_group(b.name)})
+    return sorted(out, key=lambda e: ENGINE_GROUPS.index(e["group"]))
 
 
 def to_wav_bytes(audio: np.ndarray, rate: int) -> bytes:

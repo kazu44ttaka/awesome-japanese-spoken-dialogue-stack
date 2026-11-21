@@ -64,7 +64,7 @@ let ws = null, state = 'stopped', speaking = false;
 let audioCtx = null, playHead = 0, sources = [];
 let tClick = 0, firstPlay = null;
 
-function engine() { return engines[$('engine').selectedIndex]; }
+function engine() { return engines.find((e) => e.name === $('engine').value); }
 function setStatus(text, error = false) { $('status').textContent = text; $('status').classList.toggle('error', error); }
 function setState(s, detail) {
   state = s;
@@ -149,7 +149,7 @@ async function handle(ev) {
   const d = msg.data || [];
   switch (msg.type) {
     case 'hello':
-      if (msg.engine) { const i = engines.findIndex((e) => e.name === msg.engine); if (i >= 0) { $('engine').selectedIndex = i; syncEngine(); } }
+      if (msg.engine && engines.some((e) => e.name === msg.engine)) { $('engine').value = msg.engine; syncEngine(); }
       if (msg.device) $('device').value = msg.device;
       setVoices(msg.voices || []);
       setState(msg.state, msg.detail);
@@ -225,10 +225,17 @@ $('halt').onclick = () => { ws.send(JSON.stringify({type: 'halt'})); stopPlaybac
 $('save').onclick = () => { location.href = '/api/last.wav'; };
 $('sample').onchange = () => { $('text').value = samples[$('sample').value]; };
 
+function fillGrouped(sel, items) {  // 実行系ごとに <optgroup> でまとめる（items は group ごとに並んでいる）
+  let og = null;
+  for (const it of items) {
+    if (!og || og.label !== it.group) { og = document.createElement('optgroup'); og.label = it.group; sel.append(og); }
+    const o = document.createElement('option'); o.value = it.name; o.textContent = it.label; og.append(o);
+  }
+}
 fetch('/api/engines').then((r) => r.json()).then((j) => {
   engines = j.engines; samples = j.samples; labels = j.state_labels; colors = j.state_colors;
-  for (const e of engines) { const o = document.createElement('option'); o.value = e.name; o.textContent = e.label; $('engine').append(o); }
-  $('engine').selectedIndex = Math.max(0, engines.findIndex((e) => e.name === j.default));
+  fillGrouped($('engine'), engines);
+  $('engine').value = engines.some((e) => e.name === j.default) ? j.default : engines[0].name;
   for (const k of Object.keys(samples)) { const o = document.createElement('option'); o.value = k; o.textContent = k; $('sample').append(o); }
   $('text').value = Object.values(samples)[0] || '';
   syncEngine();

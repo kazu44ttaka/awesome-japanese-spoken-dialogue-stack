@@ -79,9 +79,16 @@ def clean_text(text: str) -> str:
     return re.sub(r"(?<=[^\x00-\x7f])\s+|\s+(?=[^\x00-\x7f])", "", text or "").strip()
 
 
+# 一覧は実行系ごとにまとめて出す（この順）
+MODEL_GROUPS = ["元の実装（PyTorch・NeMo など）", "sherpa-onnx", "CrispASR", "audio.cpp", "speech.cpp（Vulkan）"]
+_RUNTIME_GROUP = {"sherpa-onnx": "sherpa-onnx", "crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp（Vulkan）"}
+
+
 def model_choices() -> list[dict]:
-    """[{name, label, gpu, streaming}]。GUI と Web のモデルの一覧。"""
-    return [{"name": b.name, "label": b.label, "gpu": b.gpu, "streaming": b.streaming} for b in BACKENDS.values()]
+    """[{name, label, gpu, streaming, group}]。GUI と Web のモデルの一覧（実行系ごとにまとめた順）。"""
+    items = [{"name": b.name, "label": b.label, "gpu": b.gpu, "streaming": b.streaming,
+              "group": _RUNTIME_GROUP.get(b.runtime, MODEL_GROUPS[0])} for b in BACKENDS.values()]
+    return sorted(items, key=lambda m: MODEL_GROUPS.index(m["group"]))
 
 
 def list_audio_devices(kind: str) -> list[tuple[int | None, str]]:

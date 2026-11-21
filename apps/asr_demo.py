@@ -26,6 +26,7 @@ from asr_core import (  # noqa: E402
 )
 
 from PySide6.QtCore import QObject, Signal  # noqa: E402
+from qt_util import fill_grouped  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -65,9 +66,7 @@ class MainWindow(QMainWindow):
         grid = QGridLayout(model_box)
         grid.addWidget(QLabel("ASRエンジン"), 0, 0)
         self.model_combo = QComboBox()
-        for m in self.models:
-            self.model_combo.addItem(m["label"], m["name"])
-        self.model_combo.setCurrentIndex(next(i for i, m in enumerate(self.models) if m["name"] == DEFAULT_MODEL))
+        fill_grouped(self.model_combo, self.models, DEFAULT_MODEL)  # 実行系ごとに見出しを挟む
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         grid.addWidget(self.model_combo, 0, 1, 1, 3)
         grid.addWidget(QLabel("Device"), 1, 0)
@@ -183,7 +182,7 @@ class MainWindow(QMainWindow):
         return bar
 
     def _model(self) -> dict:
-        return self.models[self.model_combo.currentIndex()]
+        return next(m for m in self.models if m["name"] == self.model_combo.currentData())
 
     def _sync_device(self) -> None:
         gpu = self._model()["gpu"]

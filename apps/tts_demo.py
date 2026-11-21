@@ -30,6 +30,7 @@ from tts_core import (  # noqa: E402
 )
 
 from PySide6.QtCore import QObject, Signal  # noqa: E402
+from qt_util import fill_grouped  # noqa: E402
 from PySide6.QtGui import QFont, QTextCursor  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
@@ -171,9 +172,7 @@ class MainWindow(QMainWindow):
         grid = QGridLayout(engine_box)
         grid.addWidget(QLabel("TTSエンジン"), 0, 0)
         self.engine_combo = QComboBox()
-        for e in self.engines:
-            self.engine_combo.addItem(e["label"], e["name"])
-        self.engine_combo.setCurrentIndex(next(i for i, e in enumerate(self.engines) if e["name"] == DEFAULT_ENGINE))
+        fill_grouped(self.engine_combo, self.engines, DEFAULT_ENGINE)  # 実行系ごとに見出しを挟む
         self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         grid.addWidget(self.engine_combo, 0, 1, 1, 3)
         self.device_label = QLabel("Device")
@@ -277,7 +276,7 @@ class MainWindow(QMainWindow):
         self.status.setText(self.player.error)
 
     def _engine(self) -> dict:
-        return self.engines[self.engine_combo.currentIndex()]
+        return next(e for e in self.engines if e["name"] == self.engine_combo.currentData())
 
     def _sync_engine(self) -> None:
         e = self._engine()

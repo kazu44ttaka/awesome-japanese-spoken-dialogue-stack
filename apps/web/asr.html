@@ -130,7 +130,7 @@ function syncButtons() {
   $('unlisten').disabled = !listening;
 }
 function syncDevice() {
-  const m = models[$('model').selectedIndex];
+  const m = models.find((x) => x.name === $('model').value);
   if (!m) return;
   if (!m.gpu) $('device').value = 'cpu';
   $('device').disabled = !m.gpu;
@@ -164,7 +164,7 @@ function connect() {
     const d = msg.data || [];
     switch (msg.type) {
       case 'hello':
-        if (msg.model) { const i = models.findIndex((m) => m.name === msg.model); if (i >= 0) { $('model').selectedIndex = i; syncDevice(); } }
+        if (msg.model && models.some((m) => m.name === msg.model)) { $('model').value = msg.model; syncDevice(); }
         if (msg.device) $('device').value = msg.device;
         setState(msg.state, msg.detail);
         break;
@@ -243,7 +243,7 @@ $('model').onchange = () => {
 };
 $('startModel').onclick = () => {
   if (listening) stopListening();
-  ws.send(JSON.stringify({type: 'start_model', name: models[$('model').selectedIndex].name, device: $('device').value}));
+  ws.send(JSON.stringify({type: 'start_model', name: $('model').value, device: $('device').value}));
 };
 $('stopModel').onclick = () => { if (listening) stopListening(); ws.send(JSON.stringify({type: 'stop_model'})); };
 $('listen').onclick = async () => {
@@ -259,10 +259,17 @@ $('unlisten').onclick = () => stopListening();
 $('clear').onclick = () => { $('log').textContent = ''; partialLine = null; };
 $('resetOpts').onclick = () => setOptions(defaults);
 
+function fillGrouped(sel, items) {  // 実行系ごとに <optgroup> でまとめる（items は group ごとに並んでいる）
+  let og = null;
+  for (const it of items) {
+    if (!og || og.label !== it.group) { og = document.createElement('optgroup'); og.label = it.group; sel.append(og); }
+    const o = document.createElement('option'); o.value = it.name; o.textContent = it.label; og.append(o);
+  }
+}
 fetch('/api/models').then((r) => r.json()).then((j) => {
   models = j.models; defaults = j.options; labels = j.state_labels; colors = j.state_colors;
-  for (const m of models) { const o = document.createElement('option'); o.textContent = m.label; o.value = m.name; $('model').append(o); }
-  $('model').selectedIndex = Math.max(0, models.findIndex((m) => m.name === j.default));
+  fillGrouped($('model'), models);
+  $('model').value = models.some((m) => m.name === j.default) ? j.default : models[0].name;
   setOptions(defaults);
   syncDevice();
   setState('stopped');
