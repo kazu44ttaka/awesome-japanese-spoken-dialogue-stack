@@ -4,6 +4,7 @@
 
 ## 2026-11-21
 
+- README の ASR の表に 4 つの評価データの読みの CER、TTS の表に合成時間・読みの CER・UTMOS・最初の声までの時間の列を足した。README を awesome の一覧の形に整理し、目的別のおすすめを足した
 - 名前を awesome-japanese-spoken-dialogue-stack に変えた（前は awesome-japanese-speech）。LLM やターンテイキングのモデルも入る、音声対話の部品の一覧なので
 - [ASR の精度](benchmarks/asr/2026-11-3sets.md) に、2 人の自由会話（MagicHub）での 29 構成の比較を追加
 - [実行系の比較](benchmarks/2026-11-runtimes.md) に、ストリーミングの遅れ（話し終わってから文字が出るまで・音素ごとの遅れ・TTS の最初の声）、TTS の自然さ（UTMOS）と話者の近さ、LLM の実行系（LM Studio・llama.cpp）の比較を追加
