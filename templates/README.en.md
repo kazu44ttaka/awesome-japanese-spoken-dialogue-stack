@@ -13,9 +13,9 @@ ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue 
 
 ## Latest updates
 
+- **2026-11-22** Measured on CPU the models only measured on GPU and filled the remaining gaps (conversation and more). Added configurations the runtimes support but we had not set up (LFM2.5-Audio, Kitten and ZONOS3 on audio.cpp, Qwen3-TTS VoiceDesign, Moonshine on CrispASR and more).
 - **2026-11-21** Added ASR on free two-person conversation, streaming latency, TTS naturalness (UTMOS) and LLM runtimes. Fixed how numerals are scored and rescored every result. Checked every model license.
 - **2026-11-18** Added a [page](benchmarks/2026-11-runtimes.md) comparing the same model across runtimes.
-- **2026-11-17** Added CrispASR, audio.cpp and speech.cpp as runtimes; ASR latency measured separately on GPU and CPU.
 
 [Full changelog](CHANGELOG.md)
 
@@ -44,7 +44,7 @@ First choices based on our measurements. Check the license column below before c
 | Text while the user is still speaking | Pseudo-streaming Parakeet TDT-CTC or Haas-ja | Text appears ~60-130 ms after each phoneme; true-streaming Nemotron takes 0.5-0.8 s ([streaming](benchmarks/2026-11-runtimes.md#ストリーミング)) |
 | Fast TTS | VOICEVOX (voicevox_core), Supertonic 3 (audio.cpp) | ~50 ms and ~90 ms per sentence on GPU ([TTS](benchmarks/tts/2026-11-tts.md)) |
 | Voice cloning | Qwen3-TTS (audio.cpp, speech.cpp) | ~0.6 s per sentence, 32-92 ms to first audio when streaming ([runtimes](benchmarks/2026-11-runtimes.md)) |
-| Voice from a text description | Irodori-TTS v4.1 (audio.cpp) | ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
+| Voice from a text description | Qwen3-TTS 1.7B VoiceDesign (audio.cpp), Irodori-TTS (audio.cpp) | Qwen3-TTS ~0.7 s per sentence with 25 ms to first audio; Irodori ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
 | Fast first reply from the LLM | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms and 45 ms to the first token ([LLM](benchmarks/llm/2026-11-lmstudio.md)) |
 
 **Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The numbers come from the configuration shown as "values:" in the notes; "—" means not measured. The benchmark pages are in Japanese.

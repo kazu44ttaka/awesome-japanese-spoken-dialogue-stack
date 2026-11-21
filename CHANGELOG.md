@@ -2,6 +2,16 @@
 
 新しい順。測った値が変わった更新には、どの値が変わったかを書いています。
 
+## 2026-11-22
+
+- 表の空いていたところを測った（どれも AC 電源で、電源が外れたら止める見張りを付けた）
+  - CPU：GPU だけで測っていた ASR 18 構成（NeMo 版・Qwen3-ASR 1.7B・anime-whisper・Kotoba-Whisper v2.2 など）と TTS 9 構成（Style-Bert-VITS2・GPT-SoVITS・AivisSpeech・mio-tts-cpp・Kitten など）
+  - 会話：ほかの評価データでは測っていたのに会話では測っていなかった 16 構成と Nemotron 80 ms 版
+  - 3 つの評価データ：CrispASR の NeMo 系 3 構成と audio.cpp の Voxtral。CrispASR の Parakeet CTC 1.1B の GGUF がギャルゲーの音声の版から変換されていることが、値で確かめられた
+  - TTS のストリーミングとメモリの空き
+- 実行系は対応しているのに入れていなかった構成を足した：Moonshine の CrispASR 版、Granite 4.1 の Plus・NAR 版、LFM2.5-Audio JP の audio.cpp 版（ASR・TTS）、Qwen3-TTS 1.7B VoiceDesign（audio.cpp・CrispASR）、Kitten TTS 2 と ZONOS3-Mini の audio.cpp 版。LFM2.5-Audio JP は audio.cpp なら ASR としても使える（CrispASR では繰り返す）
+- 測れなかったもの：speech.cpp の Qwen3-TTS のクローン（Base 版が無い）、audio.cpp の Kokoro（日本語の辞書が GGUF に入っていない）、Granite 4.1 NAR 版（日本語に非対応）
+
 ## 2026-11-21
 
 - README に「実行系（推論のライブラリ）」の節を足し、sherpa-onnx・faster-whisper・CrispASR・audio.cpp・speech.cpp・llama.cpp・LM Studio へのリンクを載せた

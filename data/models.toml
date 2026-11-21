@@ -197,8 +197,8 @@ cer = [0.040, 0.111, 0.033, 0.151]
 overlap = ["reazonspeech"]
 measured = "faster-whisper・int8・beam 5（ほかは beam 1）・先頭に 0.5 秒の無音"
 measured_en = "faster-whisper, int8, beam 5 (others use beam 1), 0.5 s leading silence"
-note_ja = "日本語特化の蒸留 Whisper。MaAI-SDS の設定（先頭に 0.5 秒の無音）。GPU 約 175 ms"
-note_en = "Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU"
+note_ja = "日本語特化の蒸留 Whisper。MaAI-SDS の設定（先頭に 0.5 秒の無音）。GPU 約 175 ms・CPU 約 3.5 秒"
+note_en = "Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU, ~3.5 s on CPU"
 
 [[asr]]
 name = "Whisper large-v3-turbo"
@@ -236,7 +236,7 @@ url = "https://huggingface.co/UsefulSensors/moonshine-tiny-ja"
 org = "Moonshine AI (Useful Sensors)"
 ja = "native"
 streaming = "no"
-runtime = "Transformers, ONNX"
+runtime = "Transformers, ONNX, CrispASR"
 size = "27M"
 license = "Moonshine AI Community License（年商 100 万ドル未満なら商用可）"
 license_en = "Moonshine AI Community License (commercial use allowed under USD 1M annual revenue)"
@@ -245,8 +245,8 @@ bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.080, 0.072, 0.047, 0.175]
 measured = "Transformers"
 measured_en = "Transformers"
-note_ja = "27M と極小。CPU で 約 150 ms"
-note_en = "Only 27M. ~150 ms on CPU"
+note_ja = "27M と極小。CPU で 約 150 ms。CrispASR（GGUF）は GPU で 約 70 ms と速いが、放送の話し言葉で悪い（0.110）"
+note_en = "Only 27M. ~150 ms on CPU. CrispASR (GGUF) is faster on GPU (~70 ms) but worse on broadcast speech (0.110)"
 
 [[asr]]
 name = "Granite Speech 5.0 470M TurboCTC"
@@ -337,8 +337,8 @@ cer = [0.060, 0.085, 0.059, 0.190]
 overlap = ["reazonspeech", "cv"]
 measured = "CrispASR・Q4_K（ほかは Q8_0 か元の精度）"
 measured_en = "CrispASR, Q4_K (others use Q8_0 or full precision)"
-note_ja = "1 発話 約 480 ms。同じ句をくり返すことがある"
-note_en = "~480 ms per utterance. Sometimes loops on a phrase"
+note_ja = "1 発話 約 480 ms。同じ句をくり返すことがある。Plus 版も同じくらい（会話 0.158）。NAR 版は日本語に非対応"
+note_en = "~480 ms per utterance. Sometimes loops on a phrase. The Plus variant is similar (conversation 0.158); the NAR variant does not handle Japanese"
 
 [[asr]]
 name = "Moonshine base-ja"
@@ -346,7 +346,7 @@ url = "https://huggingface.co/UsefulSensors/moonshine-base-ja"
 org = "Moonshine AI (Useful Sensors)"
 ja = "native"
 streaming = "no"
-runtime = "Transformers, ONNX"
+runtime = "Transformers, ONNX, CrispASR"
 size = "重み 約 240 MB"
 size_en = "~240 MB weights"
 license = "Moonshine AI Community License（年商 100 万ドル未満なら商用可）"
@@ -356,8 +356,8 @@ bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.070, 0.044, 0.035, 0.220]
 measured = "Transformers"
 measured_en = "Transformers"
-note_ja = "放送の話し言葉に強い。CPU 約 330 ms。20 秒を超えると最後に繰り返すことがある"
-note_en = "Strong on broadcast speech. ~330 ms on CPU. May repeat at the end of utterances over 20 s"
+note_ja = "放送の話し言葉に強い。CPU 約 330 ms。CrispASR（GGUF）は GPU で 約 130 ms と速いが、放送の話し言葉で悪い（0.086）。20 秒を超えると最後に繰り返すことがある"
+note_en = "Strong on broadcast speech. ~330 ms on CPU. CrispASR (GGUF) is faster on GPU (~130 ms) but worse on broadcast speech (0.086). May repeat at the end of utterances over 20 s"
 
 [[asr]]
 name = "Parakeet CTC 1.1B ja"
@@ -375,8 +375,8 @@ bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.053, 0.084, 0.039, 0.167]
 measured = "NeMo"
 measured_en = "NeMo"
-note_ja = "GPU 約 65 ms。一般向けの parakeet-ja.nemo を使う（-gal はギャルゲーの音声の版）"
-note_en = "~65 ms on GPU. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune)"
+note_ja = "GPU 約 65 ms・CPU 約 590 ms。一般向けの parakeet-ja.nemo を使う（-gal はギャルゲーの音声の版。CrispASR 向けの GGUF はこちらから変換されている）"
+note_en = "~65 ms on GPU, ~590 ms on CPU. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune, and the CrispASR GGUF was converted from it)"
 
 [[asr]]
 name = "Voxtral Mini 4B Realtime"
@@ -439,8 +439,8 @@ utmos = 3.85
 first_voice_ms = nan
 measured = "エンジン"
 measured_en = "engine"
-note_ja = "導入が楽で読みが正確。文の長さによる時間の差が小さい"
-note_en = "Easy to install with accurate readings; time varies little with sentence length"
+note_ja = "導入が楽で読みが正確。文の長さによる時間の差が小さい。CPU では 1 文 約 1.8 秒"
+note_en = "Easy to install with accurate readings; time varies little with sentence length. ~1.8 s per sentence on CPU"
 
 [[tts]]
 name = "VOICEVOX"
@@ -514,8 +514,8 @@ utmos = 2.23
 first_voice_ms = nan
 measured = "C++ サーバー"
 measured_en = "C++ server"
-note_ja = "C++ だけで動き省メモリ。数字は前処理で読みに直す。文末に余計な言葉が付くことがある"
-note_en = "Pure C++ with a small footprint. Normalise numbers first; may append extra words"
+note_ja = "C++ だけで動き省メモリ。CPU でも 1 文 約 0.7 秒。数字は前処理で読みに直す。文末に余計な言葉が付くことがある"
+note_en = "Pure C++ with a small footprint; ~0.7 s per sentence even on CPU. Normalise numbers first; may append extra words"
 
 [[tts]]
 name = "CosyVoice3 0.5B"
@@ -576,8 +576,8 @@ utmos = 4.00
 first_voice_ms = 92
 measured = "audio.cpp・1.7B Base・クローン"
 measured_en = "audio.cpp, 1.7B Base, cloning"
-note_ja = "声の指示・設計・クローン。公式の PyTorch は 1 文 8〜9 秒。speech.cpp では最初の声まで 32〜81 ms"
-note_en = "Voice instructions, design and cloning. 8-9 s per sentence with official PyTorch. 32-81 ms to first audio with speech.cpp"
+note_ja = "声の指示・設計・クローン。公式の PyTorch は 1 文 8〜9 秒。speech.cpp では最初の声まで 32〜81 ms。VoiceDesign（声を文章で指定）も audio.cpp で 1 文 0.71 秒・最初の声 25 ms"
+note_en = "Voice instructions, design and cloning. 8-9 s per sentence with official PyTorch; 32-81 ms to first audio with speech.cpp. VoiceDesign (voice from a description) takes 0.71 s per sentence with audio.cpp, 25 ms to first audio"
 
 [[tts]]
 name = "Kokoro-82M"
@@ -765,7 +765,7 @@ url = "https://github.com/Zyphra/ZONOS3-Mini"
 org = "Zyphra"
 ja = "multi"
 streaming = "no"
-runtime = "ggml（C++ サーバー）, PyTorch"
+runtime = "ggml（C++ サーバー）, audio.cpp, PyTorch"
 runtime_en = "ggml (C++ server), PyTorch"
 size = "GGUF 一式 約 1.2 GB"
 size_en = "~1.2 GB GGUF set"
@@ -779,8 +779,8 @@ utmos = 3.26
 first_voice_ms = nan
 measured = "ggml サーバー"
 measured_en = "ggml server"
-note_ja = "速いが、数字の前処理が無く「2026年」などを読み違える"
-note_en = "Fast, but no number normalisation, so years and similar numbers are misread"
+note_ja = "速いが、数字の前処理が無く「2026年」などを読み違える。audio.cpp では 1 文 約 225 ms・最初の声 88 ms"
+note_en = "Fast, but no number normalisation, so years and similar numbers are misread. ~225 ms per sentence with audio.cpp, 88 ms to first audio"
 
 [[tts]]
 name = "Kitten TTS 2"
@@ -788,7 +788,7 @@ url = "https://huggingface.co/KittenML/kitten-tts-2"
 org = "KittenML (Stellon Labs)"
 ja = "multi"
 streaming = "no"
-runtime = "kittenml（PyTorch, vLLM）"
+runtime = "kittenml（PyTorch, vLLM）, audio.cpp"
 runtime_en = "kittenml (PyTorch, vLLM)"
 size = "重み 約 1 GB"
 size_en = "~1 GB weights"
@@ -802,8 +802,8 @@ utmos = 1.60
 first_voice_ms = nan
 measured = "PyTorch"
 measured_en = "PyTorch"
-note_ja = "日本語の声が 4 つ。読みは正確だが遅い"
-note_en = "Four Japanese voices. Accurate readings but slow"
+note_ja = "日本語の声が 4 つ。読みは正確。torch では遅いが、audio.cpp なら 1 文 約 0.9 秒"
+note_en = "Four Japanese voices with accurate readings. Slow with torch, ~0.9 s per sentence with audio.cpp"
 
 [[tts]]
 name = "LFM2.5-Audio-1.5B-JP"
@@ -811,7 +811,7 @@ url = "https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-JP"
 org = "Liquid AI"
 ja = "native"
 streaming = "true"
-runtime = "liquid-audio (PyTorch)"
+runtime = "liquid-audio (PyTorch), audio.cpp, CrispASR"
 size = "1.5B（重み 約 3.5 GB）"
 size_en = "1.5B (~3.5 GB weights)"
 license = "LFM Open License v1.0（年商 1000 万ドル未満は商用可）"
@@ -824,8 +824,8 @@ utmos = 3.72
 first_voice_ms = nan
 measured = "PyTorch"
 measured_en = "PyTorch"
-note_ja = "音声対話モデルの TTS 機能で、声は選べない。ASR としては精度が低い（CER 0.28〜0.79）"
-note_en = "TTS mode of a speech-to-speech model; single voice. Weak as ASR (CER 0.28-0.79)"
+note_ja = "音声対話モデルの TTS 機能で、声は選べない。audio.cpp なら 1 文 約 0.33 秒・最初の声 51 ms。ASR としても audio.cpp なら使える（CER 0.035〜0.249）が、CrispASR では同じ句をくり返す"
+note_en = "TTS mode of a speech-to-speech model; single voice. ~0.33 s per sentence with audio.cpp, 51 ms to first audio. Also usable as ASR with audio.cpp (CER 0.035-0.249), while CrispASR loops on phrases"
 
 [[tts]]
 name = "MOSS-TTS-Nano"
@@ -866,8 +866,8 @@ utmos = 2.61
 first_voice_ms = nan
 measured = "PyTorch・JVNV の声"
 measured_en = "PyTorch, JVNV voice"
-note_ja = "速く読みも正確。声と UTMOS は学習したモデルごと。AivisSpeech も同じ系統"
-note_en = "Fast and accurate. Voice and UTMOS depend on the trained model; AivisSpeech uses the same family"
+note_ja = "速く読みも正確（CPU でも 1 文 約 1.3 秒）。声と UTMOS は学習したモデルごと。AivisSpeech も同じ系統"
+note_en = "Fast and accurate (~1.3 s per sentence even on CPU). Voice and UTMOS depend on the trained model; AivisSpeech uses the same family"
 
 [[tts]]
 name = "GPT-SoVITS"

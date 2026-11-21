@@ -13,9 +13,9 @@
 
 ## 最近の更新
 
+- **2026-11-22** GPU だけで測っていたモデルを CPU でも測り、会話などの空いていたところを埋めた。実行系は対応しているのに入れていなかった構成（LFM2.5-Audio・Kitten・ZONOS3 の audio.cpp 版、Qwen3-TTS VoiceDesign、Moonshine の CrispASR 版など）を足した
 - **2026-11-21** 2 人の自由会話での ASR の比較、ストリーミングの遅れ、TTS の自然さ（UTMOS）、LLM の実行系の比較を追加。数字の採点の誤りを直して、全結果を採点し直した。全モデルのライセンスを確かめた
 - **2026-11-18** 同じモデルを実行系ごとに比べる [ページ](benchmarks/2026-11-runtimes.md) を追加
-- **2026-11-17** CrispASR・audio.cpp・speech.cpp を比べる実行系に追加。ASR の処理時間を GPU と CPU に分けて測った
 
 [すべての更新履歴](CHANGELOG.md)
 
@@ -44,7 +44,7 @@
 | 話している途中から文字を出す | Parakeet TDT-CTC・Haas-ja の疑似ストリーミング | 音素を話してから文字が出るまで 約 60〜130 ms。真のストリーミングの Nemotron は 0.5〜0.8 秒（[ストリーミング](benchmarks/2026-11-runtimes.md#ストリーミング)） |
 | 速く読み上げる | VOICEVOX（voicevox_core）、Supertonic 3（audio.cpp） | GPU で 1 文 約 50 ms・約 90 ms（[TTS](benchmarks/tts/2026-11-tts.md)） |
 | 声を真似て読み上げる | Qwen3-TTS（audio.cpp・speech.cpp） | 1 文 約 0.6 秒、ストリーミングで最初の声まで 32〜92 ms（[実行系の比較](benchmarks/2026-11-runtimes.md)） |
-| 声を文章で指定する | Irodori-TTS v4.1（audio.cpp） | 1 文 約 0.4 秒（[実行系の比較](benchmarks/2026-11-runtimes.md)） |
+| 声を文章で指定する | Qwen3-TTS 1.7B VoiceDesign（audio.cpp）、Irodori-TTS（audio.cpp） | Qwen3-TTS は 1 文 約 0.7 秒・最初の声まで 25 ms、Irodori は 1 文 約 0.4 秒（[実行系の比較](benchmarks/2026-11-runtimes.md)） |
 | 返事を速く始める | LFM2.5 1.2B JP、ELYZA-Shortcut 7B | 最初の文字まで 39 ms・45 ms（[LLM](benchmarks/llm/2026-11-lmstudio.md)） |
 
 **表の見方**：CER は読みの CER（カタカナの読みに直して比べた文字誤り率。小さいほどよい）。時間は特に書かないかぎり GPU で、ASR は 1 発話、TTS は 1 文あたり。表の数字は、メモの「値：」に書いた構成で測ったもの。「—」は測っていないもの。
