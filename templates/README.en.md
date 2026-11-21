@@ -45,11 +45,11 @@ First choices based on our measurements. Check the license column below before c
 | Voice from a text description | Irodori-TTS v4.1 (audio.cpp) | ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
 | Fast first reply from the LLM | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms and 45 ms to the first token ([LLM](benchmarks/llm/2026-11-lmstudio.md)) |
 
-**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The benchmark pages are in Japanese.
+**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The numbers come from the configuration shown as "values:" in the notes. Bold marks the best value in each column; "—" means not measured. The benchmark pages are in Japanese.
 
 ## ASR
 
-"Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
+The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER on each test set (read speech, TV broadcasts, crowd-sourced read speech and free two-person conversation; [details](benchmarks/asr/2026-11-3sets.md)). "Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
 
 <!-- table:asr -->
 
@@ -59,7 +59,7 @@ First choices based on our measurements. Check the license column below before c
 
 ## TTS
 
-"Streaming" yes means audio can start before the whole sentence is synthesised.
+ms/sentence is the mean synthesis time over 20 sentences; Reading CER is the median over three ASR transcriptions of the audio; UTMOS estimates naturalness (1-5; trained on English, so treat it as a guide); First audio ms is the median time to the first audio when streaming ([details](benchmarks/2026-11-runtimes.md#tts)). "Streaming" yes means audio can start before the whole sentence is synthesised.
 
 <!-- table:tts -->
 

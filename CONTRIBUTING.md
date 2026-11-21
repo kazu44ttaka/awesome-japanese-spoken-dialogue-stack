@@ -22,4 +22,5 @@ README.md / README.en.md は自動で作るので、直接は編集しないで�
 - 評価データの音声はリポジトリに入れず、取得のしかたを書く
 - ウォームアップ（1 回目）は除き、平均だけでなく最悪値も書く
 - `benchmarks/<asr|tts|llm>/<日付>-<内容>.md` に置き、`data/models.toml` の `bench` からリンクする
+- README の表に出す値（ASR の `cer`、TTS の `tts_ms`・`tts_cer`・`utmos`・`first_voice_ms`）と、それを測った構成（`measured`）を `data/models.toml` に書き写す
 - 値が変わる更新は [CHANGELOG.md](CHANGELOG.md) に書く

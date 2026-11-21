@@ -14,6 +14,9 @@
 #   commercial  "yes" / "no" / "cond"（年商などの条件つきで可） / "model"（声やモデルごとに違う） /
 #               "unknown"（ライセンスの記載が無い） / "tbd"（要確認）
 #   bench       測定結果のあるページ（benchmarks/ 以下）。無ければ省略
+#   cer         ASR の読みの CER [FLEURS, ReazonSpeech, Common Voice, 会話]。測っていないものは nan
+#   tts_ms / tts_cer / utmos / first_voice_ms  TTS の 1 文の合成時間（GPU）・読みの CER・UTMOS・最初の声までの時間（中央値）
+#   measured / measured_en  上の値を測った構成（実行系など）
 #   note_ja / note_en  一言メモ
 
 # ---------------------------------------------------------------------------- ASR
@@ -28,8 +31,11 @@ size = "約 0.8B（音声エンコーダ + Qwen3-0.6B デコーダ）"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "CER 0.033〜0.125。CrispASR（GPU）で 1 発話 約 130 ms と PyTorch の 5 倍速い。sherpa-onnx 版は話し言葉で崩れる"
-note_en = "CER 0.033-0.125. ~130 ms per utterance with CrispASR on GPU, 5x faster than PyTorch. The sherpa-onnx build degrades on conversational speech"
+cer = [0.033, 0.125, 0.034, 0.176]
+measured = "funasr"
+measured_en = "funasr"
+note_ja = "CrispASR（GPU）で 1 発話 約 130 ms と PyTorch の 5 倍速い。会話の値は相づち 3 区間の繰り返しの暴走を含む（除くと 0.093）。sherpa-onnx 版は話し言葉で崩れる"
+note_en = "~130 ms per utterance with CrispASR on GPU, 5x faster than PyTorch. The conversation score includes 3 runaway repetitions on backchannels (0.093 without them). The sherpa-onnx build degrades on conversational speech"
 
 [[asr]]
 name = "SenseVoiceSmall"
@@ -43,8 +49,11 @@ license = "コード MIT・モデル FunASR Model License v1.1（出典の表示
 license_en = "Code MIT, model FunASR Model License v1.1 (attribution required)"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "CPU 約 90 ms・GPU 約 40 ms と速いが、放送の話し言葉で崩れる（CER 0.183）。sherpa-onnx は 2024-07-17 版を使う"
-note_en = "Fast (~90 ms on CPU, ~40 ms on GPU) but degrades on broadcast speech (CER 0.183). Use the 2024-07-17 sherpa-onnx build"
+cer = [0.049, 0.183, 0.044, 0.126]
+measured = "sherpa-onnx"
+measured_en = "sherpa-onnx"
+note_ja = "CPU 約 90 ms・GPU 約 40 ms と速いが、放送の話し言葉で崩れる。sherpa-onnx は 2024-07-17 版を使う"
+note_en = "Fast (~90 ms on CPU, ~40 ms on GPU) but degrades on broadcast speech. Use the 2024-07-17 sherpa-onnx build"
 
 [[asr]]
 name = "Parakeet TDT-CTC 0.6B ja"
@@ -57,8 +66,11 @@ size = "0.6B"
 license = "CC-BY-4.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "CER 0.023〜0.092。GPU 約 40〜55 ms・CPU 約 180 ms。疑似ストリーミングで文字が出るまで 約 70 ms と最も速い"
-note_en = "CER 0.023-0.092. ~40-55 ms on GPU, ~180 ms on CPU. Fastest text with pseudo-streaming (~70 ms after each phoneme)"
+cer = [0.038, 0.092, 0.023, 0.122]
+measured = "NeMo"
+measured_en = "NeMo"
+note_ja = "GPU 約 40〜55 ms・CPU 約 180 ms。疑似ストリーミングで文字が出るまで 約 70 ms と最も速い"
+note_en = "~40-55 ms on GPU, ~180 ms on CPU. Fastest text with pseudo-streaming (~70 ms after each phoneme)"
 
 [[asr]]
 name = "Cohere Transcribe (03-2026)"
@@ -72,8 +84,11 @@ license = "Apache-2.0（取得に同意が必要）"
 license_en = "Apache-2.0 (gated: accept the terms to download)"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "3 つの評価データを通して上位（CER 0.017〜0.048）。CPU 約 0.8 秒・GPU（audio.cpp）約 100 ms。14 言語"
-note_en = "Consistently near the top (CER 0.017-0.048). ~0.8 s on CPU, ~100 ms on GPU (audio.cpp). 14 languages"
+cer = [0.023, 0.048, 0.017, 0.140]
+measured = "sherpa-onnx"
+measured_en = "sherpa-onnx"
+note_ja = "どの評価データでも上位。CPU 約 0.8 秒・GPU（audio.cpp）約 100 ms。14 言語"
+note_en = "Near the top on every test set. ~0.8 s on CPU, ~100 ms on GPU (audio.cpp). 14 languages"
 
 [[asr]]
 name = "Cohere ASR ja v0.1"
@@ -89,8 +104,11 @@ license = "記載なし（元の Cohere Transcribe は Apache-2.0）"
 license_en = "Not stated (the base Cohere Transcribe is Apache-2.0)"
 commercial = "unknown"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "Cohere Transcribe の日本語の追加学習版。放送の話し言葉では元より悪い（CER 0.092 と 0.048）。GPU 約 190 ms"
-note_en = "Japanese fine-tune of Cohere Transcribe; worse than the base on broadcast speech (CER 0.092 vs 0.048). ~190 ms on GPU"
+cer = [0.025, 0.092, 0.018, 0.127]
+measured = "CrispASR"
+measured_en = "CrispASR"
+note_ja = "Cohere Transcribe の日本語の追加学習版。放送の話し言葉では元より悪い。GPU 約 190 ms"
+note_en = "Japanese fine-tune of Cohere Transcribe; worse than the base on broadcast speech. ~190 ms on GPU"
 
 [[asr]]
 name = "Qwen3-ASR (1.7B / 0.6B)"
@@ -103,8 +121,11 @@ size = "1.7B / 0.6B"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "2 人の自由会話で最もよい（CER 1.7B 0.091・0.6B 0.105）が、放送の話し言葉で崩れる（0.18〜0.21）。speech.cpp（GPU）で 1.7B が 約 165 ms。sherpa-onnx では言語の指定が必要"
-note_en = "Best on free conversation (CER 1.7B 0.091, 0.6B 0.105) but degrades on broadcast speech (0.18-0.21). 1.7B runs at ~165 ms with speech.cpp on GPU. Set the language with sherpa-onnx"
+cer = [0.029, 0.182, 0.036, 0.091]
+measured = "speech.cpp・1.7B"
+measured_en = "speech.cpp, 1.7B"
+note_ja = "会話で最もよいが、放送の話し言葉で崩れる。speech.cpp（GPU）で 1.7B が 約 165 ms（PyTorch の 5 倍以上速い）。0.6B は会話 0.105。sherpa-onnx では言語の指定が必要"
+note_en = "Best on conversation but degrades on broadcast speech. 1.7B runs at ~165 ms with speech.cpp on GPU (5x+ faster than PyTorch). 0.6B scores 0.105 on conversation. Set the language with sherpa-onnx"
 
 [[asr]]
 name = "ReazonSpeech NeMo v2"
@@ -117,8 +138,11 @@ size = "619M"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "3 つの評価データとも CER 0.04 前後で、放送の話し言葉に強い。speech.cpp で 1 発話 約 100 ms（NeMo は 約 350 ms）"
-note_en = "CER ~0.04 on all three sets, strong on broadcast speech. ~100 ms with speech.cpp (~350 ms with NeMo)"
+cer = [0.038, 0.039, 0.033, 0.160]
+measured = "NeMo"
+measured_en = "NeMo"
+note_ja = "放送の話し言葉に強い。speech.cpp で 1 発話 約 100 ms（NeMo は 約 350 ms）"
+note_en = "Strong on broadcast speech. ~100 ms with speech.cpp (~350 ms with NeMo)"
 
 [[asr]]
 name = "ReazonSpeech k2-v2"
@@ -131,8 +155,11 @@ size = "159M"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "CPU で 約 90 ms と速く、CER 0.024〜0.036（ReazonSpeech で 1 位。同じコーパスで学習）。音声がいきなり始まると最初の語を落とすので、先頭に無音を足す"
-note_en = "Fast on CPU (~90 ms), CER 0.024-0.036 (best on ReazonSpeech, which it was trained on). Drops the first word when audio starts abruptly; pad leading silence"
+cer = [0.036, 0.025, 0.024, 0.147]
+measured = "sherpa-onnx"
+measured_en = "sherpa-onnx"
+note_ja = "CPU で 約 90 ms と速い。ReazonSpeech で 1 位（同じコーパスで学習）。音声がいきなり始まると最初の語を落とすので、先頭に無音を足す"
+note_en = "Fast on CPU (~90 ms). Best on ReazonSpeech, which it was trained on. Drops the first word when audio starts abruptly; pad leading silence"
 
 [[asr]]
 name = "Nemotron Speech ASR 0.6B (streaming)"
@@ -145,8 +172,11 @@ size = "0.6B"
 license = "OpenMDW-1.1"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "真のストリーミング（80 / 560 ms チャンク）。CER 0.07〜0.21 と低めで、短い発話を落とすことがある。文字が出るまで 0.5〜0.8 秒"
-note_en = "True streaming (80/560 ms chunks). Lower accuracy (CER 0.07-0.21) and may drop short utterances. Text appears 0.5-0.8 s after each phoneme"
+cer = [0.084, 0.210, 0.098, 0.176]
+measured = "sherpa-onnx・560 ms"
+measured_en = "sherpa-onnx, 560 ms"
+note_ja = "真のストリーミング（80 / 560 ms チャンク）。精度は低めで、短い発話を落とすことがある。文字が出るまで 0.5〜0.8 秒"
+note_en = "True streaming (80/560 ms chunks). Lower accuracy and may drop short utterances. Text appears 0.5-0.8 s after each phoneme"
 
 [[asr]]
 name = "Kotoba-Whisper v2.2"
@@ -159,8 +189,11 @@ size = "約 756M"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-08-jsut20.md"
-note_ja = "日本語特化の蒸留 Whisper。faster-whisper（int8・beam 5）で CER 0.033〜0.111"
-note_en = "Japanese distilled Whisper. CER 0.033-0.111 with faster-whisper (int8, beam 5)"
+cer = [0.040, 0.111, 0.033, nan]
+measured = "faster-whisper・int8・beam 5"
+measured_en = "faster-whisper, int8, beam 5"
+note_ja = "日本語特化の蒸留 Whisper。MaAI-SDS の設定（先頭に 0.5 秒の無音）。GPU 約 175 ms"
+note_en = "Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU"
 
 [[asr]]
 name = "Whisper large-v3-turbo"
@@ -173,8 +206,11 @@ size = "809M"
 license = "MIT"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "比較の基準。CER 0.024〜0.073（温度を上げて出し直す設定あり）。faster-whisper（GPU）で 約 180 ms"
-note_en = "Baseline. CER 0.024-0.073 (with temperature fallback). ~180 ms with faster-whisper on GPU"
+cer = [0.024, 0.073, 0.028, 0.145]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "比較の基準。温度を上げて出し直す設定で測った。faster-whisper（GPU）で 約 180 ms"
+note_en = "Baseline, measured with temperature fallback. ~180 ms with faster-whisper on GPU"
 
 [[asr]]
 name = "VibeVoice-ASR"
@@ -201,8 +237,11 @@ license = "Moonshine AI Community License（年商 100 万ドル未満なら商�
 license_en = "Moonshine AI Community License (commercial use allowed under USD 1M annual revenue)"
 commercial = "cond"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "27M と極小。CPU で 約 150 ms・CER 0.047〜0.080"
-note_en = "Only 27M. ~150 ms on CPU, CER 0.047-0.080"
+cer = [0.080, 0.072, 0.047, 0.175]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "27M と極小。CPU で 約 150 ms"
+note_en = "Only 27M. ~150 ms on CPU"
 
 [[asr]]
 name = "Granite Speech 5.0 470M TurboCTC"
@@ -216,8 +255,11 @@ size_en = "470M (encoder-only CTC)"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "GPU で 1 発話 16 ms と最も速く、CER 0.014〜0.072。CPU は float32 で 約 320 ms（bfloat16 のままだと 約 6 秒）。読点をほぼ出さない"
-note_en = "Fastest on GPU (16 ms per utterance), CER 0.014-0.072. ~320 ms on CPU in float32 (~6 s in bfloat16). Rarely outputs commas"
+cer = [0.031, 0.072, 0.014, 0.168]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "GPU で 1 発話 16 ms と最も速い。CPU は float32 で 約 320 ms（bfloat16 のままだと 約 6 秒）。読点をほぼ出さない"
+note_en = "Fastest on GPU (16 ms per utterance). ~320 ms on CPU in float32 (~6 s in bfloat16). Rarely outputs commas"
 
 [[asr]]
 name = "Fun-ASR-MLT-Nano-2512"
@@ -230,8 +272,11 @@ size = "約 0.8B"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "3 つの評価データで上位（CER 0.013〜0.058。FLEURS は学習との重なりの疑い）。CrispASR で 約 160 ms（funasr は 0.4〜1 秒）"
-note_en = "Top tier on all three sets (CER 0.013-0.058; FLEURS may overlap its training data). ~160 ms with CrispASR (0.4-1 s with funasr)"
+cer = [0.013, 0.058, 0.022, 0.098]
+measured = "funasr"
+measured_en = "funasr"
+note_ja = "どの評価データでも上位（FLEURS は学習との重なりの疑い）。CrispASR で 約 160 ms（funasr は 0.4〜1 秒）"
+note_en = "Top tier everywhere (FLEURS may overlap its training data). ~160 ms with CrispASR (0.4-1 s with funasr)"
 
 [[asr]]
 name = "Haas-ja v1.0"
@@ -245,8 +290,11 @@ size_en = "~1.2 GB weights"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "3 つの評価データの平均順位で 1 位（CER 0.007〜0.038）・GPU 約 40 ms。ReazonSpeech と Common Voice で学習しているので、その 2 つは有利"
-note_en = "Best average rank (CER 0.007-0.038) at ~40 ms on GPU. Trained on ReazonSpeech and Common Voice, so those two scores are favourable"
+cer = [0.025, 0.038, 0.007, 0.128]
+measured = "haas-asr"
+measured_en = "haas-asr"
+note_ja = "3 つの評価データの平均順位で 1 位・GPU 約 40 ms。ReazonSpeech と Common Voice で学習しているので、その 2 つは有利"
+note_en = "Best average rank at ~40 ms on GPU. Trained on ReazonSpeech and Common Voice, so those two scores are favourable"
 
 [[asr]]
 name = "Granite 4.0 1B Speech"
@@ -260,8 +308,11 @@ size_en = "1B (~4.4 GB weights)"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "CER 0.017〜0.095。LLM 型で GPU でも 約 1.2 秒（CrispASR の Q4_K で 約 460 ms）。Common Voice で学習"
-note_en = "CER 0.017-0.095. LLM-style, ~1.2 s even on GPU (~460 ms with CrispASR Q4_K). Trained with Common Voice"
+cer = [0.036, 0.095, 0.017, 0.201]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "LLM 型で GPU でも 約 1.2 秒（CrispASR の Q4_K で 約 460 ms）。Common Voice で学習"
+note_en = "LLM-style, ~1.2 s even on GPU (~460 ms with CrispASR Q4_K). Trained with Common Voice"
 
 [[asr]]
 name = "Granite Speech 4.1 2B"
@@ -274,8 +325,11 @@ size = "2B"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "CrispASR（Q4_K）で CER 0.059〜0.085・約 480 ms。同じ句をくり返すことがある"
-note_en = "CER 0.059-0.085 at ~480 ms with CrispASR (Q4_K). Sometimes loops on a phrase"
+cer = [0.060, 0.085, 0.059, 0.190]
+measured = "CrispASR・Q4_K"
+measured_en = "CrispASR, Q4_K"
+note_ja = "1 発話 約 480 ms。同じ句をくり返すことがある"
+note_en = "~480 ms per utterance. Sometimes loops on a phrase"
 
 [[asr]]
 name = "Moonshine base-ja"
@@ -290,8 +344,11 @@ license = "Moonshine AI Community License（年商 100 万ドル未満なら商�
 license_en = "Moonshine AI Community License (commercial use allowed under USD 1M annual revenue)"
 commercial = "cond"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "放送の話し言葉に強い（CER 0.044）。CPU 約 330 ms。20 秒を超えると最後に繰り返すことがある"
-note_en = "Strong on broadcast speech (CER 0.044). ~330 ms on CPU. May repeat at the end of utterances over 20 s"
+cer = [0.070, 0.044, 0.035, 0.220]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "放送の話し言葉に強い。CPU 約 330 ms。20 秒を超えると最後に繰り返すことがある"
+note_en = "Strong on broadcast speech. ~330 ms on CPU. May repeat at the end of utterances over 20 s"
 
 [[asr]]
 name = "Parakeet CTC 1.1B ja"
@@ -306,8 +363,11 @@ license = "Apache-2.0（元の Parakeet は CC-BY-4.0）"
 license_en = "Apache-2.0 (base Parakeet is CC-BY-4.0)"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "GPU 約 65 ms・CER 0.039〜0.084。一般向けの parakeet-ja.nemo を使う（-gal はギャルゲーの音声の版）"
-note_en = "~65 ms on GPU, CER 0.039-0.084. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune)"
+cer = [0.053, 0.084, 0.039, 0.167]
+measured = "NeMo"
+measured_en = "NeMo"
+note_ja = "GPU 約 65 ms。一般向けの parakeet-ja.nemo を使う（-gal はギャルゲーの音声の版）"
+note_en = "~65 ms on GPU. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune)"
 
 [[asr]]
 name = "Voxtral Mini 4B Realtime"
@@ -321,8 +381,11 @@ size_en = "4B (~8.3 GB weights)"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "日本語は中位以下（CER 0.066〜0.187）で、何も出さない発話がある。言語を指定できない。audio.cpp・CrispASR で 約 1.3 秒"
-note_en = "Mid-to-low on Japanese (CER 0.066-0.187) with empty outputs; no language hint. ~1.3 s with audio.cpp or CrispASR"
+cer = [0.066, 0.187, 0.074, 0.232]
+measured = "Transformers（会話は CrispASR）"
+measured_en = "Transformers (conversation: CrispASR)"
+note_ja = "何も出さない発話がある。言語を指定できない。audio.cpp・CrispASR で 約 1.3 秒"
+note_en = "Empty outputs on some utterances; no language hint. ~1.3 s with audio.cpp or CrispASR"
 
 [[asr]]
 name = "anime-whisper"
@@ -336,8 +399,11 @@ size_en = "~756M (based on Kotoba-Whisper v2.0)"
 license = "MIT"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-note_ja = "アニメ・ゲームの台詞で追加学習した Kotoba-Whisper。会話では元と同じくらい（CER 0.145）、放送の話し言葉では悪い（0.191）。CrispASR の変換版は大きく悪い"
-note_en = "Kotoba-Whisper fine-tuned on anime and game dialogue. Similar to the base on conversation (CER 0.145), worse on broadcast speech (0.191). The CrispASR conversion is much worse"
+cer = [0.043, 0.191, 0.036, 0.145]
+measured = "Transformers"
+measured_en = "Transformers"
+note_ja = "アニメ・ゲームの台詞で追加学習した Kotoba-Whisper。会話では元と同じくらい、放送の話し言葉では悪い。CrispASR の変換版は大きく悪い"
+note_en = "Kotoba-Whisper fine-tuned on anime and game dialogue. Similar to the base on conversation, worse on broadcast speech. The CrispASR conversion is much worse"
 
 [[asr_todo]]
 name = "Parakeet 1.1B RNNT Multilingual"
@@ -357,8 +423,14 @@ size = "AIVMX モデルごと"
 license = "エンジン LGPL-3.0 / 声はモデルごと"
 commercial = "model"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "導入が楽で読みが正確。1 文 約 400 ms（GPU）"
-note_en = "Easy to install with accurate readings. ~400 ms per sentence (GPU)"
+tts_ms = 408
+tts_cer = 0.004
+utmos = 3.85
+first_voice_ms = nan
+measured = "エンジン"
+measured_en = "engine"
+note_ja = "導入が楽で読みが正確。文の長さによる時間の差が小さい"
+note_en = "Easy to install with accurate readings; time varies little with sentence length"
 
 [[tts]]
 name = "VOICEVOX"
@@ -370,8 +442,14 @@ runtime = "独立エンジン + HTTP API, voicevox_core（C API / Python）"
 size = "—"
 license = "エンジン LGPL-3.0 / 声はキャラクターごとの規約"
 commercial = "model"
-note_ja = "日本語の定番。voicevox_core（GPU）で 1 文 約 50 ms と最も速く、読みの誤りなし。声ごとに利用規約が違う"
-note_en = "The Japanese standard. Fastest with voicevox_core on GPU (~50 ms per sentence) with no reading errors. Terms differ per voice"
+tts_ms = 53
+tts_cer = 0.000
+utmos = 2.74
+first_voice_ms = nan
+measured = "voicevox_core"
+measured_en = "voicevox_core"
+note_ja = "日本語の定番で、最も速く読みの誤りなし。CPU（8 スレッド）でも 約 500 ms。UTMOS は声による。声ごとに利用規約が違う"
+note_en = "The Japanese standard: fastest with no reading errors, ~500 ms even on CPU (8 threads). UTMOS depends on the voice. Terms differ per voice"
 bench = "benchmarks/tts/2026-11-tts.md"
 
 [[tts]]
@@ -385,8 +463,14 @@ size = "約 2.9 GB（実行時 VRAM 3.6 GB）"
 license = "MIT（コード・モデル）"
 commercial = "yes"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "声を文章で指定（キャプション）でき、クローンもできる。1 文 約 1.3 秒、audio.cpp なら 約 0.4 秒（MF 版は 約 0.2 秒）"
-note_en = "Voice design from a caption, plus cloning. ~1.3 s per sentence, ~0.4 s with audio.cpp (~0.2 s for the MF variant)"
+tts_ms = 1334
+tts_cer = 0.000
+utmos = 3.45
+first_voice_ms = nan
+measured = "PyTorch・40 ステップ"
+measured_en = "PyTorch, 40 steps"
+note_ja = "声を文章で指定（キャプション）でき、クローンもできる。公式の高速化の設定（6 ステップ・sway）で 約 0.8 秒。audio.cpp なら v4 Small が 約 0.4 秒、v4.1 Small MF が 約 0.2 秒"
+note_en = "Voice design from a caption, plus cloning. ~0.8 s with the official fast setting (6 steps, sway). With audio.cpp, v4 Small takes ~0.4 s and v4.1 Small MF ~0.2 s"
 
 [[tts]]
 name = "Tsukasa Speech"
@@ -414,8 +498,14 @@ license = "MIT（コード。モデルは MioTTS の Apache-2.0）"
 license_en = "MIT (code; the MioTTS models are Apache-2.0)"
 commercial = "yes"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "C++ だけで動き省メモリ。GPU で 1 文 約 0.8 秒。数字は前処理で読みに直す。文末に余計な言葉が付くことがある"
-note_en = "Pure C++ with a small footprint. ~0.8 s per sentence on GPU. Normalise numbers first; may append extra words"
+tts_ms = 796
+tts_cer = 0.017
+utmos = 2.23
+first_voice_ms = nan
+measured = "C++ サーバー"
+measured_en = "C++ server"
+note_ja = "C++ だけで動き省メモリ。数字は前処理で読みに直す。文末に余計な言葉が付くことがある"
+note_en = "Pure C++ with a small footprint. Normalise numbers first; may append extra words"
 
 [[tts]]
 name = "CosyVoice3 0.5B"
@@ -428,8 +518,14 @@ size = "0.5B（配布一式 約 9 GB）"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "日本語はカタカナで渡す（漢字のままだと CER 0.44）。CrispASR で 1 文 約 0.45 秒（公式は 約 3.3 秒）"
-note_en = "Pass Japanese as katakana (kanji input gives CER 0.44). ~0.45 s per sentence with CrispASR (~3.3 s official)"
+tts_ms = 450
+tts_cer = 0.013
+utmos = 3.39
+first_voice_ms = nan
+measured = "CrispASR・カタカナ"
+measured_en = "CrispASR, katakana"
+note_ja = "日本語はカタカナで渡す（漢字のままだと CER 0.44）。公式の PyTorch は 1 文 約 3.3 秒"
+note_en = "Pass Japanese as katakana (kanji input gives CER 0.44). ~3.3 s per sentence with official PyTorch"
 
 [[tts]]
 name = "Supertonic3"
@@ -444,8 +540,14 @@ license = "コード MIT・モデル OpenRAIL-M"
 license_en = "Code MIT, model OpenRAIL-M"
 commercial = "yes"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "audio.cpp（GPU）で 1 文 約 90 ms と速い。Python の ONNX 版はスレッドを 4〜8 にする。開発は 2026-07 に終了"
-note_en = "Fast with audio.cpp on GPU (~90 ms per sentence). Set 4-8 threads for the Python ONNX build. Development ended 2026-07"
+tts_ms = 91
+tts_cer = 0.022
+utmos = 4.18
+first_voice_ms = 69
+measured = "audio.cpp"
+measured_en = "audio.cpp"
+note_ja = "UTMOS が最も高い。Python の ONNX 版（CPU）はスレッドを 4〜8 にする。開発は 2026-07 に終了"
+note_en = "Highest UTMOS. Set 4-8 threads for the Python ONNX build on CPU. Development ended 2026-07"
 
 [[tts]]
 name = "Qwen3-TTS (0.6B / 1.7B)"
@@ -458,8 +560,14 @@ size = "0.6B / 1.7B"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "声の指示・設計・クローン。audio.cpp・speech.cpp で 1 文 約 0.6 秒（公式の PyTorch は 8〜9 秒）、ストリーミングで最初の声まで 32〜92 ms"
-note_en = "Voice instructions, design and cloning. ~0.6 s per sentence with audio.cpp or speech.cpp (8-9 s with official PyTorch); 32-92 ms to first audio when streaming"
+tts_ms = 679
+tts_cer = 0.006
+utmos = 4.00
+first_voice_ms = 92
+measured = "audio.cpp・1.7B Base・クローン"
+measured_en = "audio.cpp, 1.7B Base, cloning"
+note_ja = "声の指示・設計・クローン。公式の PyTorch は 1 文 8〜9 秒。speech.cpp では最初の声まで 32〜81 ms"
+note_en = "Voice instructions, design and cloning. 8-9 s per sentence with official PyTorch. 32-81 ms to first audio with speech.cpp"
 
 [[tts]]
 name = "Kokoro-82M"
@@ -487,8 +595,14 @@ license = "モデル Fish Audio Research License（非商用。商用は別契�
 license_en = "Model: Fish Audio Research License (non-commercial; commercial use needs a separate licence). Code: Fish Audio Community License (commercial use under USD 500K annual revenue)"
 commercial = "no"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "PyTorch 版は 12 GB GPU に載らない。audio.cpp（Q8_0）でクローンして CER 0.004・1 文 約 2.3 秒"
-note_en = "The PyTorch release does not fit a 12 GB GPU. audio.cpp (Q8_0): CER 0.004 when cloning, ~2.3 s per sentence"
+tts_ms = 2304
+tts_cer = 0.004
+utmos = 3.85
+first_voice_ms = 91
+measured = "audio.cpp・クローン"
+measured_en = "audio.cpp, cloning"
+note_ja = "PyTorch 版は 12 GB GPU に載らないが、audio.cpp（Q8_0）なら動く"
+note_en = "The PyTorch release does not fit a 12 GB GPU, but audio.cpp (Q8_0) runs it"
 
 [[tts]]
 name = "OmniVoice"
@@ -503,8 +617,14 @@ license = "コード Apache-2.0・モデル CC-BY-NC"
 license_en = "Code Apache-2.0, model CC-BY-NC"
 commercial = "no"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "多言語のクローン。CER 0.000〜0.009、audio.cpp で 1 文 約 0.36 秒"
-note_en = "Multilingual cloning. CER 0.000-0.009, ~0.36 s per sentence with audio.cpp"
+tts_ms = 363
+tts_cer = 0.000
+utmos = 3.46
+first_voice_ms = 306
+measured = "audio.cpp・クローン"
+measured_en = "audio.cpp, cloning"
+note_ja = "多言語のクローン。PyTorch では 1 文 約 1 秒"
+note_en = "Multilingual cloning. ~1 s per sentence with PyTorch"
 
 [[tts]]
 name = "MioTTS (0.6B / 1.7B)"
@@ -519,8 +639,14 @@ license = "Apache-2.0（MioCodec は MIT）"
 license_en = "Apache-2.0 (MioCodec is MIT)"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "1.7B は audio.cpp でクローンして CER 0.006・1 文 約 0.8 秒。CrispASR の 0.6B は温度を 0.8 にする（既定の 0 では止まらない）"
-note_en = "1.7B with audio.cpp: CER 0.006 when cloning, ~0.8 s per sentence. Set temperature 0.8 for the CrispASR 0.6B (the default 0 runs on)"
+tts_ms = 806
+tts_cer = 0.006
+utmos = 3.28
+first_voice_ms = nan
+measured = "audio.cpp・1.7B・クローン"
+measured_en = "audio.cpp, 1.7B, cloning"
+note_ja = "mio-tts-cpp の大きい版。CrispASR の 0.6B は温度を 0.8 にする（既定の 0 では止まらない）"
+note_en = "Larger versions of the mio-tts-cpp model. Set temperature 0.8 for the CrispASR 0.6B (the default 0 runs on)"
 
 [[tts]]
 name = "VoxCPM2"
@@ -533,8 +659,14 @@ size = "—"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "30 言語のクローン。CrispASR で CER 0.011・1 文 約 1.4 秒（audio.cpp は速いが CER 0.068）"
-note_en = "Cloning in 30 languages. CrispASR: CER 0.011 at ~1.4 s per sentence (audio.cpp is faster but CER 0.068)"
+tts_ms = 1368
+tts_cer = 0.011
+utmos = 3.66
+first_voice_ms = nan
+measured = "CrispASR・クローン"
+measured_en = "CrispASR, cloning"
+note_ja = "30 言語のクローン。audio.cpp は 約 0.8 秒と速いが CER 0.068"
+note_en = "Cloning in 30 languages. audio.cpp is faster (~0.8 s) but CER 0.068"
 
 [[tts]]
 name = "MOSS-TTS-Local v1.5"
@@ -547,8 +679,14 @@ size = "—"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "クローンで CER 0.006（CrispASR・1 文 約 1.4 秒・GPU メモリ 9 GB）。audio.cpp では 1 文 約 10 秒と遅い"
-note_en = "CER 0.006 when cloning (CrispASR, ~1.4 s per sentence, 9 GB GPU memory). ~10 s per sentence with audio.cpp"
+tts_ms = 1364
+tts_cer = 0.006
+utmos = 3.85
+first_voice_ms = nan
+measured = "CrispASR・クローン"
+measured_en = "CrispASR, cloning"
+note_ja = "GPU メモリ 9 GB。audio.cpp では 11.6 GB まで増え、1 文 約 10 秒と遅い"
+note_en = "9 GB of GPU memory; audio.cpp grows to 11.6 GB and takes ~10 s per sentence"
 
 [[tts]]
 name = "Higgs Audio TTS 3 4B"
@@ -562,8 +700,14 @@ license = "研究・非商用のライセンス"
 license_en = "Research and non-commercial license"
 commercial = "no"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "audio.cpp（Q8_0）でクローンして CER 0.004・1 文 約 1.3 秒"
-note_en = "audio.cpp (Q8_0): CER 0.004 when cloning, ~1.3 s per sentence"
+tts_ms = 1292
+tts_cer = 0.004
+utmos = 4.01
+first_voice_ms = 205
+measured = "audio.cpp・クローン"
+measured_en = "audio.cpp, cloning"
+note_ja = "クローンの読みが正確。非商用"
+note_en = "Accurate readings when cloning. Non-commercial"
 
 [[tts]]
 name = "Confucius4-TTS"
@@ -576,8 +720,14 @@ size = "—"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "日本語は読みが大きく崩れた（CER 0.39〜0.41）"
-note_en = "Japanese readings broke down (CER 0.39-0.41)"
+tts_ms = 2568
+tts_cer = 0.391
+utmos = 2.84
+first_voice_ms = 2338
+measured = "audio.cpp・クローン"
+measured_en = "audio.cpp, cloning"
+note_ja = "日本語は読みが大きく崩れた（CrispASR でも同じ）"
+note_en = "Japanese readings broke down (also with CrispASR)"
 
 [[tts]]
 name = "OuteTTS 1.0 1B"
@@ -590,8 +740,14 @@ size = "1B"
 license = "CC-BY-NC-SA-4.0"
 commercial = "no"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "audio.cpp で 1 文 約 23 秒と遅く、CER 0.104"
-note_en = "Slow with audio.cpp (~23 s per sentence), CER 0.104"
+tts_ms = 23056
+tts_cer = 0.104
+utmos = 3.55
+first_voice_ms = nan
+measured = "audio.cpp・クローン"
+measured_en = "audio.cpp, cloning"
+note_ja = "audio.cpp では 1 文 約 23 秒と遅い"
+note_en = "Slow with audio.cpp (~23 s per sentence)"
 
 [[tts]]
 name = "ZONOS3-Mini"
@@ -607,8 +763,14 @@ license = "コード MIT・重み Apache-2.0"
 license_en = "Code MIT, weights Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "1 文 約 270 ms と速い。数字の前処理が無く「2026年」などを読み違える"
-note_en = "Fast (~270 ms per sentence). No number normalisation, so years and similar numbers are misread"
+tts_ms = 270
+tts_cer = 0.017
+utmos = 3.26
+first_voice_ms = nan
+measured = "ggml サーバー"
+measured_en = "ggml server"
+note_ja = "速いが、数字の前処理が無く「2026年」などを読み違える"
+note_en = "Fast, but no number normalisation, so years and similar numbers are misread"
 
 [[tts]]
 name = "Kitten TTS 2"
@@ -624,8 +786,14 @@ license = "Stellon Labs Community License（商用は登録が必要・年商と
 license_en = "Stellon Labs Community License (commercial use requires registration, under USD 1M annual revenue and funding, attribution required)"
 commercial = "cond"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "日本語の声が 4 つ。読みは正確だが 1 文 約 3 秒"
-note_en = "Four Japanese voices. Accurate readings but ~3 s per sentence"
+tts_ms = 3065
+tts_cer = 0.013
+utmos = 1.60
+first_voice_ms = nan
+measured = "PyTorch"
+measured_en = "PyTorch"
+note_ja = "日本語の声が 4 つ。読みは正確だが遅い"
+note_en = "Four Japanese voices. Accurate readings but slow"
 
 [[tts]]
 name = "LFM2.5-Audio-1.5B-JP"
@@ -640,8 +808,14 @@ license = "LFM Open License v1.0（年商 1000 万ドル未満は商用可）"
 license_en = "LFM Open License v1.0 (commercial use allowed under USD 10M revenue)"
 commercial = "cond"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "音声対話モデルの TTS 機能。読みは正確だが 1 文 約 2.5 秒で、声は選べない。ASR としては精度が低い（CER 0.28〜0.79）"
-note_en = "TTS mode of a speech-to-speech model. Accurate but ~2.5 s per sentence, single voice. Weak as ASR (CER 0.28-0.79)"
+tts_ms = 2535
+tts_cer = 0.006
+utmos = 3.72
+first_voice_ms = nan
+measured = "PyTorch"
+measured_en = "PyTorch"
+note_ja = "音声対話モデルの TTS 機能で、声は選べない。ASR としては精度が低い（CER 0.28〜0.79）"
+note_en = "TTS mode of a speech-to-speech model; single voice. Weak as ASR (CER 0.28-0.79)"
 
 [[tts]]
 name = "MOSS-TTS-Nano"
@@ -654,8 +828,14 @@ size = "0.1B"
 license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/tts/2026-11-tts.md"
-note_ja = "CPU で動く 0.1B。漢字の読み間違いが多い（CER 0.14〜0.16）"
-note_en = "0.1B model that runs on CPU. Frequent kanji misreadings (CER 0.14-0.16)"
+tts_ms = 2499
+tts_cer = 0.137
+utmos = 1.50
+first_voice_ms = nan
+measured = "PyTorch"
+measured_en = "PyTorch"
+note_ja = "CPU で動く 0.1B。漢字の読み間違いが多い"
+note_en = "0.1B model that runs on CPU. Frequent kanji misreadings"
 
 [[tts]]
 name = "Style-Bert-VITS2"
@@ -670,8 +850,14 @@ license = "コード AGPL-3.0 / 声はモデルごと（例の JVNV の声は CC
 license_en = "Code AGPL-3.0 / voices per model (the JVNV example voice is CC-BY-SA-4.0)"
 commercial = "model"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "GPU で 1 文 約 0.11 秒・CER 0.002 と速く正確。声は学習したモデルごと。AivisSpeech も同じ系統"
-note_en = "Fast and accurate on GPU (~0.11 s per sentence, CER 0.002). Voices come from trained models; AivisSpeech uses the same family"
+tts_ms = 114
+tts_cer = 0.002
+utmos = 2.61
+first_voice_ms = nan
+measured = "PyTorch・JVNV の声"
+measured_en = "PyTorch, JVNV voice"
+note_ja = "速く読みも正確。声と UTMOS は学習したモデルごと。AivisSpeech も同じ系統"
+note_en = "Fast and accurate. Voice and UTMOS depend on the trained model; AivisSpeech uses the same family"
 
 [[tts]]
 name = "GPT-SoVITS"
@@ -685,8 +871,14 @@ size_en = "v2ProPlus (~1.4 GB of weights)"
 license = "MIT"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
-note_ja = "5 秒ほどの参照音声で、学習なしにクローン（話者の近さ 0.96）。GPU で 1 文 約 2.1 秒"
-note_en = "Zero-shot cloning from ~5 s of reference audio (speaker similarity 0.96). ~2.1 s per sentence on GPU"
+tts_ms = 2084
+tts_cer = 0.011
+utmos = 3.88
+first_voice_ms = 382
+measured = "PyTorch・クローン"
+measured_en = "PyTorch, cloning"
+note_ja = "5 秒ほどの参照音声で、学習なしにクローン（話者の近さ 0.96）"
+note_en = "Zero-shot cloning from ~5 s of reference audio (speaker similarity 0.96)"
 
 # ---------------------------------------------------------------------------- LLM
 # 日本語の賢さは既存のリーダーボードに任せ、ここでは音声対話での遅延を測る予定（benchmarks/llm/）。

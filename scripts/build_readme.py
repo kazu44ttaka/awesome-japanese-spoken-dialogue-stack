@@ -25,6 +25,11 @@ LABELS = {
         "commercial": {"yes": "可", "no": "不可", "cond": "条件つき", "model": "声・モデルごと", "unknown": "不明", "tbd": "要確認"},
         "bench": "測定",
         "note": "note_ja",
+        "measured": "値：{}",
+        "score_cols": {
+            "asr": ["FLEURS", "ReazonSpeech", "CV", "会話"],
+            "tts": ["1 文 ms", "読みの CER", "UTMOS", "最初の声 ms"],
+        },
     },
     "en": {
         "header": ["Model", "Developer", "Japanese", "Streaming", "Runtime", "Size", "License", "Commercial", "Notes"],
@@ -34,6 +39,11 @@ LABELS = {
         "commercial": {"yes": "yes", "no": "no", "cond": "conditional", "model": "per voice/model", "unknown": "unknown", "tbd": "TBD"},
         "bench": "results",
         "note": "note_en",
+        "measured": "values: {}",
+        "score_cols": {
+            "asr": ["FLEURS", "ReazonSpeech", "CV", "Conversation"],
+            "tts": ["ms/sentence", "Reading CER", "UTMOS", "First audio ms"],
+        },
     },
 }
 
@@ -82,10 +92,48 @@ def _en(text: str) -> str:
     return out
 
 
+# 測った値の列。(フィールド, 小数の桁, よいほう)。値は data/models.toml に書き写してある（nan は測っていない）
+SCORES = {
+    "asr": [("cer", i, 3, min) for i in range(4)],
+    "tts": [("tts_ms", None, 0, min), ("tts_cer", None, 3, min), ("utmos", None, 2, max), ("first_voice_ms", None, 0, min)],
+}
+
+
+def _score(row: dict, field: str, idx: int | None) -> float | None:
+    v = row.get(field)
+    if v is not None and idx is not None:
+        v = v[idx] if idx < len(v) else None
+    return None if v is None or v != v else float(v)  # nan は v != v
+
+
+def _score_cells(rows: list[dict], kind: str | None) -> list[list[str]]:
+    """行ごとの測った値のセル。各列でいちばんよい値を太字にする。"""
+    if not kind:
+        return [[] for _ in rows]
+    cols = []
+    for field, idx, nd, better in SCORES[kind]:
+        vals = [_score(r, field, idx) for r in rows]
+        known = [v for v in vals if v is not None]
+        best = round(better(known), nd) if known else None
+        cells = []
+        for v in vals:
+            if v is None:
+                cells.append("—")
+            else:
+                text = f"{v:.{nd}f}"
+                cells.append(f"**{text}**" if round(v, nd) == best else text)
+        cols.append(cells)
+    return [list(c) for c in zip(*cols)]
+
+
 def render_table(rows: list[dict], lang: str, prefix: str) -> str:
     lab = LABELS[lang]
-    lines = ["| " + " | ".join(lab["header"]) + " |", "|" + "---|" * len(lab["header"])]
-    for row in rows:
+    kind = "asr" if any("cer" in r for r in rows) else "tts" if any("tts_ms" in r for r in rows) else None
+    extra = lab["score_cols"][kind] if kind else []
+    header = lab["header"][:4] + extra + lab["header"][4:]
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * 4 + "---:|" * len(extra) + "---|" * (len(header) - 4 - len(extra))]
+    scores = _score_cells(rows, kind)
+    for row, score in zip(rows, scores):
         def conv(field: str) -> str:
             # 英語版は <field>_en があればそれを、無ければ定型句を置き換えたものを使う
             if lang == "en" and row.get(f"{field}_en"):
@@ -95,6 +143,9 @@ def render_table(rows: list[dict], lang: str, prefix: str) -> str:
 
         name = f"[{_cell(row['name'])}]({row['url']})"
         note = _cell(row.get(lab["note"], ""))
+        measured = row.get("measured_en" if lang == "en" else "measured")
+        if measured:
+            note += (f"（{lab['measured'].format(measured)}）" if lang == "ja" else f" ({lab['measured'].format(measured)})")
         if row.get("bench"):
             note += f" （[{lab['bench']}]({prefix}{row['bench']})）" if lang == "ja" else f" ([{lab['bench']}]({prefix}{row['bench']}))"
         cells = [
@@ -102,6 +153,7 @@ def render_table(rows: list[dict], lang: str, prefix: str) -> str:
             _cell(conv("org")),
             lab["ja"].get(row.get("ja", ""), row.get("ja", "")),
             lab["streaming"].get(row.get("streaming", ""), row.get("streaming", "")),
+            *score,
             _cell(conv("runtime")),
             _cell(conv("size")),
             _cell(conv("license")),
