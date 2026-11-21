@@ -7,7 +7,7 @@ ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue 
 [日本語](README.md)
 
 - **List**: Japanese support, streaming, license and runtimes for each model.
-- **Runtime comparison**: the same model run with its original implementation, sherpa-onnx, CrispASR, audio.cpp and speech.cpp, measured for speed, accuracy and memory. The same model can be several times faster depending on the runtime.
+- **Runtime comparison**: the same model run with its original implementation, [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), [CrispASR](https://github.com/CrispStrobe/CrispASR), [audio.cpp](https://github.com/0xShug0/audio.cpp) and [speech.cpp](https://github.com/nyosegawa/speech.cpp), measured for speed, accuracy and memory. The same model can be several times faster depending on the runtime.
 - **Latency too**: time from the end of speech to the text, and time to the first audio, which matter in spoken dialogue.
 - **Try them locally**: every measured configuration can be tried in an ASR app that recognises your microphone and a TTS app that reads text aloud, including the choice of runtime, with the latency shown as you go ([apps/](apps/README.md)).
 
@@ -26,6 +26,7 @@ ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue 
 - [TTS](#tts)
 - [LLM](#llm)
 - [Spoken dialogue (VAD, turn-taking, backchannels)](#spoken-dialogue-vad-turn-taking-backchannels)
+- [Runtimes](#runtimes)
 - [Try it](#try-it)
 - [Benchmarks](#benchmarks)
 - [Contributing](#contributing)
@@ -73,6 +74,21 @@ For knowledge and reasoning in Japanese, see the [Nejumi LLM Leaderboard](https:
 ## Spoken dialogue (VAD, turn-taking, backchannels)
 
 <!-- table:dialog -->
+
+## Runtimes
+
+The runtimes compared in the benchmarks. The same model can differ a lot in speed and memory depending on the runtime ([runtime comparison](benchmarks/2026-11-runtimes.md)).
+
+| Runtime | What it is | For |
+|---|---|---|
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Speech recognition and synthesis on ONNX Runtime, with many fast int8 builds for CPU | ASR, TTS, VAD |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Fast Whisper-family inference on CTranslate2 | ASR |
+| [CrispASR](https://github.com/CrispStrobe/CrispASR) | C++ runtime and server running many ASR and TTS models on ggml | ASR, TTS |
+| [audio.cpp](https://github.com/0xShug0/audio.cpp) | C++ server running ASR and TTS on ggml, with streaming | ASR, TTS |
+| [speech.cpp](https://github.com/nyosegawa/speech.cpp) | C++ runtime for ASR and TTS on ggml; uses Vulkan for the GPU on Windows | ASR, TTS |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp), [LM Studio](https://lmstudio.ai) | Run GGUF LLMs | LLM |
+
+Setup steps are in [docs/runtimes.md](docs/runtimes.md).
 
 ## Try it
 

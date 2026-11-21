@@ -1,7 +1,7 @@
 # 同じモデルを実行系ごとに比べる（2026-11）
 
 同じモデルでも、どの実行系（推論のライブラリ）で動かすかで、速さ・精度・メモリが大きく変わる。このページでは、
-日本語の ASR 18 モデル・TTS 22 モデルを、元の実装（PyTorch など）・sherpa-onnx・faster-whisper と、ggml 系の
+日本語の ASR 18 モデル・TTS 22 モデルを、元の実装（PyTorch など）・[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)・[faster-whisper](https://github.com/SYSTRAN/faster-whisper) と、ggml 系の
 3 つの実行系 [CrispASR](https://github.com/CrispStrobe/CrispASR)・[audio.cpp](https://github.com/0xShug0/audio.cpp)・
 [speech.cpp](https://github.com/nyosegawa/speech.cpp) で、同じ PC・同じ入力で測って並べた。
 

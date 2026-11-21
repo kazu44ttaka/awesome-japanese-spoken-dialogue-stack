@@ -7,7 +7,7 @@
 [English](README.en.md)
 
 - **一覧**：日本語への対応・ストリーミング・ライセンス・動かし方を、モデルごとに並べています。
-- **実行系の比較**：同じモデルを元の実装・sherpa-onnx・CrispASR・audio.cpp・speech.cpp で動かし、速さ・精度・メモリを測りました。同じモデルでも実行系で数倍違います。
+- **実行系の比較**：同じモデルを元の実装・[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)・[CrispASR](https://github.com/CrispStrobe/CrispASR)・[audio.cpp](https://github.com/0xShug0/audio.cpp)・[speech.cpp](https://github.com/nyosegawa/speech.cpp) で動かし、速さ・精度・メモリを測りました。同じモデルでも実行系で数倍違います。
 - **遅延も測る**：話し終わってから文字が出るまで、最初の声が出るまでなど、音声対話で効く時間も測っています。
 - **手元で試せる**：測った構成を、マイクで話して認識する ASR アプリと、文を読み上げる TTS アプリで、その場で試せます。実行系の違いも選べ、話し終わってから文字が出るまでや最初の音が出るまでの時間も表示します（[apps/](apps/README.md)）。
 
@@ -26,6 +26,7 @@
 - [TTS（音声合成）](#tts音声合成)
 - [LLM](#llm)
 - [音声対話の周辺（発話区間検出・ターンテイキング・相槌）](#音声対話の周辺発話区間検出ターンテイキング相槌)
+- [実行系（推論のライブラリ）](#実行系推論のライブラリ)
 - [動かして試す](#動かして試す)
 - [ベンチマーク](#ベンチマーク)
 - [追加・修正のしかた](#追加修正のしかた)
@@ -73,6 +74,21 @@ FLEURS・ReazonSpeech・CV・会話の列は、それぞれの評価データで
 ## 音声対話の周辺（発話区間検出・ターンテイキング・相槌）
 
 <!-- table:dialog -->
+
+## 実行系（推論のライブラリ）
+
+ベンチマークで比べた実行系です。同じモデルでも、どれで動かすかで速さやメモリが大きく変わります（[実行系の比較](benchmarks/2026-11-runtimes.md)）。
+
+| 実行系 | 内容 | 対象 |
+|---|---|---|
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | ONNX Runtime で動く音声認識・合成の実行系。CPU で速い int8 の配布物が多い | ASR・TTS・VAD |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | CTranslate2 で Whisper 系を速く動かす | ASR |
+| [CrispASR](https://github.com/CrispStrobe/CrispASR) | ggml で多くの ASR・TTS を動かす C++ の実行系とサーバー | ASR・TTS |
+| [audio.cpp](https://github.com/0xShug0/audio.cpp) | ggml で ASR・TTS を動かす C++ のサーバー。ストリーミングにも対応 | ASR・TTS |
+| [speech.cpp](https://github.com/nyosegawa/speech.cpp) | ggml で ASR・TTS を動かす C++ の実行系。Windows の GPU は Vulkan | ASR・TTS |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp)・[LM Studio](https://lmstudio.ai) | GGUF の LLM を動かす | LLM |
+
+入れ方は [docs/runtimes.md](docs/runtimes.md) にあります。
 
 ## 動かして試す
 

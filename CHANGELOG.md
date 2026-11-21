@@ -4,6 +4,7 @@
 
 ## 2026-11-21
 
+- README に「実行系（推論のライブラリ）」の節を足し、sherpa-onnx・faster-whisper・CrispASR・audio.cpp・speech.cpp・llama.cpp・LM Studio へのリンクを載せた
 - デモアプリで、ベンチマークで測った構成を全部選べるようにした（ASR 62・TTS 59。実行系ごとにまとめて表示）。ggml 系の実行系の構成はサーバーを自動で立ち上げ、audio.cpp と CrispASR の Nemotron・Voxtral は真のストリーミングで動く
 - 公平性を見直した。README の ASR の表に、評価データで学習しているモデルの印（†）を付け、太字のいちばんよい値はそれ以外から選ぶようにした（モデルカードで確かめると、ReazonSpeech で学習しているモデルは 9 つ、Common Voice は 4 つ）。Nemotron の値を元の NeMo 版にし（会話も測った）、Kotoba-Whisper v2.2 も会話で測り、beam や量子化がほかと違う行に注意を書いた。UTMOS が声で大きく変わることを書いた
 - README の ASR の表に 4 つの評価データの読みの CER、TTS の表に合成時間・読みの CER・UTMOS・最初の声までの時間の列を足した。README を awesome の一覧の形に整理し、目的別のおすすめを足した
