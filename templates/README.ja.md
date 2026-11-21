@@ -1,4 +1,4 @@
-# awesome-japanese-spoken-dialogue-component
+# awesome-japanese-spoken-dialogue-stack
 
 日本語の音声対話システムを作るための部品、**音声認識（ASR）・音声合成（TTS）・LLM** と周辺モデル（発話区間検出・ターンテイキング・相槌）をまとめた一覧です。
 
