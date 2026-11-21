@@ -10,13 +10,8 @@
 - 中身は共通（[asr_core.py](asr_core.py)・[tts_core.py](tts_core.py)）なので、どちらでも同じモデル・同じ設定で動く
 - ブラウザのマイクは安全な接続でしか使えない。この PC で開く（127.0.0.1 / localhost）なら使えるが、`--host 0.0.0.0` でほかの PC から開くときは HTTPS が要る（TTS の再生はそのまま使える）
 - Web 版を同時に使えるのは 1 つのページだけ（あとから開いたページが引き継ぐ）
-- 使い方はどれも同じ: モデル（エンジン）とデバイスを選んで「起動」→ 状態が「稼働」になったら使える →「停止」で閉じる。
-  状態は MaAI-SDS と同じ 4 つ（停止・起動中・稼働・異常）。TTS の AivisSpeech / VOICEVOX は、エンジンが動いていなければ
-  「起動」で立ち上げ、「停止」で止める（前から動いていたエンジンはそのまま）
-- ASR の区切り方と疑似ストリーミングは MaAI-SDS と同じしくみ・同じ既定値（Silero VAD の確率で判定。開始 0.7 が 0.1 秒、
-  終了 0.3 が 0.1 秒、プリロール 0.2 秒、途中経過は音声 0.25 秒ごと、0.4 秒より短い区間は直前の途中経過で確定）。
-  画面の「共通設定」で変えられる（項目名も MaAI-SDS と同じ: VAD ON threshold・VAD ON sec・VAD OFF threshold・VAD OFF sec・Min segment sec・Pre-roll buffer sec・Pseudo streaming・Pseudo chunk sec）。
-- ほかの項目名も MaAI-SDS に合わせている（ASRエンジン・Device・マイクデバイス、TTS制御・TTSエンジン・VOICEVOX Core Device・Voice/Speaker・話速（1.00が標準）・TTSテスト・テスト発話・再生開始まで）
+- 使い方：モデル（エンジン）とデバイスを選んで「起動」し、状態が「稼働」になったら使う。「停止」で閉じる。AivisSpeech / VOICEVOX は、動いていなければ「起動」で立ち上げる
+- ASR の区切り方と疑似ストリーミングは MaAI-SDS と同じしくみと既定値（Silero VAD で開始 0.7 が 0.1 秒・終了 0.3 が 0.1 秒、プリロール 0.2 秒、途中経過は音声 0.25 秒ごと）。画面の「共通設定」で変えられる。項目名も MaAI-SDS に合わせている
 
 ## ASR デモ
 
@@ -62,7 +57,7 @@ torchaudio==2.11.0
 uv pip install --python .venv-haas --override haas-overrides.txt -e models/src/Haas-ASR
 ```
 
-Parakeet CTC 1.1B 日本語（有志による日本語版）も同じ環境で動く。配布元の注意どおり `parakeet-ja-gal.nemo` を使う（もう一方は重みが壊れている）。
+Parakeet CTC 1.1B 日本語（有志による日本語版）も同じ環境で動く。一般向けの `parakeet-ja.nemo` を使う（同じリポジトリの `parakeet-ja-gal.nemo` はギャルゲーの音声で追加学習した版で、ふつうの音声では CER が大きく悪い）。
 
 ## TTS デモ
 
