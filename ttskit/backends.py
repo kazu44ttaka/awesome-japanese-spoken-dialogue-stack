@@ -42,7 +42,7 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("aivisspeech", "AivisSpeech（エンジンに HTTP で接続）", "AivisSpeech を入れて起動しておく（または「エンジンを起動」）"),
     BackendInfo("voicevox", "VOICEVOX（エンジンに HTTP で接続）", "VOICEVOX を入れて起動しておく（または「エンジンを起動」）"),
     BackendInfo("voicevox_core", "VOICEVOX Core（アプリの中で動かす）", "voicevox_core の wheel と、ダウンローダーで取った一式（runtime_dir）"),
-    BackendInfo("irodori", "Irodori-TTS v4.1 Small（GPU）", "irodori-tts（README の手順）。声は文章で指定する"),
+    BackendInfo("irodori", "Irodori-TTS v4.1 Small（PyTorch）", "irodori-tts（README の手順）。声は文章で指定する"),
     BackendInfo("supertonic", "Supertonic 3（ONNX・CPU）", "pip install supertonic"),
     BackendInfo("supertonic_cpp", "Supertonic 3（audio.cpp のサーバー・GPU）",
                 "audiocpp_server と Supertonic 3 の GGUF を tts_engines.toml に書く（MaAI-SDS と同じ動かし方）"),
@@ -54,7 +54,7 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("zonos3", "ZONOS3-Mini（C++ サーバー・GPU）", "zonos3-server をビルドし、GGUF を置く（apps/README.md）"),
     BackendInfo("kitten", "Kitten TTS 2（別の環境）", "pip install kittenml（別の環境 .venv-kitten）。商用は登録が要る"),
     BackendInfo("lfm_audio", "LFM2.5-Audio-1.5B-JP（別の環境・GPU）", "pip install liquid-audio（別の環境 .venv-lfm）"),
-    BackendInfo("moss_nano", "MOSS-TTS-Nano 0.1B（別の環境・CPU）", "MOSS-TTS-Nano を clone して入れる（別の環境 .venv-nano）"),
+    BackendInfo("moss_nano", "MOSS-TTS-Nano 0.1B（別の環境）", "MOSS-TTS-Nano を clone して入れる（別の環境 .venv-nano）"),
     # ggml の実行系と比べるための元の実装（docs/runtimes.md の「比べるための元の実装」）
     BackendInfo("qwen3-tts-0.6b-base", "Qwen3-TTS 0.6B Base（PyTorch・クローン・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),
     BackendInfo("qwen3-tts-0.6b-customvoice", "Qwen3-TTS 0.6B CustomVoice（PyTorch・別の環境）", "qwen-tts を別の環境に入れ、tts_engines.toml の python に書く"),

@@ -80,8 +80,8 @@ def clean_text(text: str) -> str:
 
 
 # 一覧は実行系ごとにまとめて出す（この順）
-MODEL_GROUPS = ["元の実装（PyTorch・NeMo など）", "sherpa-onnx", "CrispASR", "audio.cpp", "speech.cpp（Vulkan）"]
-_RUNTIME_GROUP = {"sherpa-onnx": "sherpa-onnx", "crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp（Vulkan）"}
+MODEL_GROUPS = ["元の実装（PyTorch・NeMo など）", "sherpa-onnx", "CrispASR", "audio.cpp", "speech.cpp"]
+_RUNTIME_GROUP = {"sherpa-onnx": "sherpa-onnx", "crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp"}
 
 
 def model_choices() -> list[dict]:

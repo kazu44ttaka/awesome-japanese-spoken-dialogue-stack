@@ -41,24 +41,24 @@ class BackendInfo:
     name: str
     label: str
     runtime: str  # "transformers" / "funasr" / "sherpa-onnx"
-    gpu: bool  # GPU で動かせるか（sherpa-onnx の配布物は CPU 用）
+    gpu: bool  # GPU で動かせるか（sherpa-onnx は CUDA 版が入っていれば GPU、無ければ CPU で動く）
     streaming: bool = False  # 真のストリーミング（create_streaming で作る）
     cpu: bool = True  # CPU で動かせるか（False なら GPU だけ。haas-asr は Triton のカーネルを使うので GPU でしか動かない）
 
 
 BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
-    BackendInfo("nemotron-560ms", "Nemotron 3.5 streaming 0.6B・560 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
-    BackendInfo("nemotron-80ms", "Nemotron 3.5 streaming 0.6B・80 ms（真のストリーミング・CPU）", "sherpa-onnx", False, True),
-    BackendInfo("nemotron-nemo", "Nemotron 3.5 streaming 0.6B・NeMo（真のストリーミング・GPU・専用の環境）", "nemo", False, True),
-    BackendInfo("sherpa-sensevoice", "SenseVoiceSmall（sherpa-onnx・CPU）", "sherpa-onnx", False),
-    BackendInfo("sherpa-parakeet-ctc", "Parakeet TDT-CTC 0.6B 日本語（sherpa-onnx・CPU）", "sherpa-onnx", False),
-    BackendInfo("sherpa-reazonspeech-k2", "ReazonSpeech k2-v2（sherpa-onnx・CPU）", "sherpa-onnx", False),
-    BackendInfo("sherpa-cohere", "Cohere ASR 日本語（sherpa-onnx・CPU）", "sherpa-onnx", False),
-    BackendInfo("sherpa-funasr-nano", "Fun-ASR-Nano（sherpa-onnx・CPU）", "sherpa-onnx", False),
-    BackendInfo("sherpa-qwen3-asr", "Qwen3-ASR 0.6B（sherpa-onnx・CPU）", "sherpa-onnx", False),
+    BackendInfo("nemotron-560ms", "Nemotron 3.5 streaming 0.6B・560 ms（sherpa-onnx・真のストリーミング）", "sherpa-onnx", True, True),
+    BackendInfo("nemotron-80ms", "Nemotron 3.5 streaming 0.6B・80 ms（sherpa-onnx・真のストリーミング）", "sherpa-onnx", True, True),
+    BackendInfo("nemotron-nemo", "Nemotron 3.5 streaming 0.6B（NeMo・真のストリーミング・専用の環境）", "nemo", True, True),
+    BackendInfo("sherpa-sensevoice", "SenseVoiceSmall（sherpa-onnx）", "sherpa-onnx", True),
+    BackendInfo("sherpa-parakeet-ctc", "Parakeet TDT-CTC 0.6B ja（sherpa-onnx・CTC）", "sherpa-onnx", True),
+    BackendInfo("sherpa-reazonspeech-k2", "ReazonSpeech k2-v2（sherpa-onnx）", "sherpa-onnx", True),
+    BackendInfo("sherpa-cohere", "Cohere Transcribe（sherpa-onnx）", "sherpa-onnx", True),
+    BackendInfo("sherpa-funasr-nano", "Fun-ASR-Nano-2512（sherpa-onnx）", "sherpa-onnx", True),
+    BackendInfo("sherpa-qwen3-asr", "Qwen3-ASR 0.6B（sherpa-onnx）", "sherpa-onnx", True),
     BackendInfo("faster-whisper", "Whisper large-v3-turbo（faster-whisper）", "faster-whisper", True),
     BackendInfo("faster-whisper-sds", "Kotoba-Whisper v2.2（faster-whisper・MaAI-SDS の設定）", "faster-whisper", True),
-    BackendInfo("sherpa-reazonspeech-k2-sds", "ReazonSpeech k2-v2（sherpa-onnx・CPU・MaAI-SDS の設定）", "sherpa-onnx", False),
+    BackendInfo("sherpa-reazonspeech-k2-sds", "ReazonSpeech k2-v2（sherpa-onnx・CPU だけ・MaAI-SDS の設定）", "sherpa-onnx", False),
     BackendInfo("qwen3-asr-0.6b", "Qwen3-ASR 0.6B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("qwen3-asr-1.7b", "Qwen3-ASR 1.7B（qwen-asr・PyTorch）", "qwen-asr", True),
     BackendInfo("moonshine-tiny-ja", "Moonshine tiny-ja（transformers）", "transformers", True),
@@ -66,10 +66,10 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
     BackendInfo("granite-4.0-1b", "Granite 4.0 1B Speech（transformers）", "transformers", True),
     BackendInfo("voxtral-realtime", "Voxtral Mini 4B Realtime・480 ms（transformers・GPU 約 9 GB）", "transformers", True),
     BackendInfo("moonshine-base-ja", "Moonshine base-ja（transformers）", "transformers", True),
-    BackendInfo("haas-ja", "Haas-ja-v1.0（haas-asr・GPU だけ・専用の環境）", "haas-asr", True, cpu=False),
-    BackendInfo("parakeet-ctc-1.1b-ja", "Parakeet CTC 1.1B 日本語（NeMo・専用の環境）", "nemo", True),
+    BackendInfo("haas-ja", "Haas-ja v1.0（haas-asr・GPU だけ・専用の環境）", "haas-asr", True, cpu=False),
+    BackendInfo("parakeet-ctc-1.1b-ja", "Parakeet CTC 1.1B ja（NeMo・専用の環境）", "nemo", True),
     BackendInfo("reazonspeech-nemo-v2", "ReazonSpeech NeMo v2（NeMo・専用の環境）", "nemo", True),
-    BackendInfo("parakeet-tdt-ctc-0.6b-ja", "Parakeet TDT-CTC 0.6B 日本語（NeMo・専用の環境）", "nemo", True),
+    BackendInfo("parakeet-tdt-ctc-0.6b-ja", "Parakeet TDT-CTC 0.6B ja（NeMo・専用の環境）", "nemo", True),
     BackendInfo("whisper-large-v3-turbo", "Whisper large-v3-turbo（transformers）", "transformers", True),
     BackendInfo("kotoba-whisper-v2.0", "Kotoba-Whisper v2.0（transformers）", "transformers", True),
     BackendInfo("anime-whisper", "anime-whisper（transformers）", "transformers", True),
@@ -82,13 +82,15 @@ BACKENDS: dict[str, BackendInfo] = {b.name: b for b in [
 def _add_runtime_backends() -> None:
     """ggml 系の実行系（CrispASR・audio.cpp・speech.cpp）の構成を、測定と同じ一覧（runtimes/catalog.py）から足す。"""
     try:
-        from runtimes.catalog import APP_STREAMING_ASR, ASR, label
+        from runtimes.catalog import APP_CPU_ONLY, APP_STREAMING_ASR, ASR, label
     except ImportError:  # リポジトリの外から asrkit だけを使うとき
         return
     for runtime, models in ASR.items():
         for key, spec in models.items():
             name = f"{runtime}-{key}"
-            BACKENDS[name] = BackendInfo(name, label(runtime, key, spec), runtime, True, name in APP_STREAMING_ASR)
+            cpu_only = name in APP_CPU_ONLY
+            BACKENDS[name] = BackendInfo(name, label(runtime, key, spec, "CPU だけ" if cpu_only else ""), runtime,
+                                         not cpu_only, name in APP_STREAMING_ASR)
 
 
 _add_runtime_backends()
@@ -523,6 +525,7 @@ class NemoNemotron:
         if not python or not python_path.is_file():
             raise RuntimeError("apps/asr_engines.toml の [nemotron_nemo] python に、nemo-toolkit を入れた環境の python を書いてください")
         self.chunk_ms = int(cfg.get("chunk_ms", 560))
+        self.device = str(cfg.get("device", "cuda"))
         with socket.socket() as s:  # 空いているポート
             s.bind(("127.0.0.1", 0))
             port = s.getsockname()[1]
@@ -683,6 +686,7 @@ def create_streaming(name: str, threads: int = 4, model_dir: Path | None = None,
         return RuntimeStreaming(runtime, key, device, threads)
     if name == "nemotron-nemo":
         cfg = dict((config if config is not None else load_config()).get("nemotron_nemo", {}))
+        cfg["device"] = "cuda" if device.startswith("cuda") else "cpu"  # アプリで選んだデバイスを使う
         return NemoNemotron(cfg)
     chunk = {"nemotron-560ms": 560, "nemotron-80ms": 80}[name]
     provider = "cuda" if device.startswith("cuda") and sherpa_has_cuda() else "cpu"

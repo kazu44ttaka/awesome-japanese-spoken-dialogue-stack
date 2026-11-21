@@ -190,7 +190,10 @@ class MainWindow(QMainWindow):
         if fixed:
             self.device_combo.setCurrentText(fixed)
         self.device_combo.setEnabled(fixed is None)
-        self.device_combo.setToolTip({None: "", "cpu": "このモデルは CPU で動かす", "cuda": "このモデルは GPU でしか動かない"}[fixed])
+        tip = {None: "", "cpu": "このモデルは CPU で動かす", "cuda": "このモデルは GPU でしか動かない"}[fixed]
+        if fixed is None and m["name"].startswith("speechcpp-"):
+            tip = "cuda を選ぶと Vulkan で GPU を使う"
+        self.device_combo.setToolTip(tip)
 
     def _on_model_changed(self, _index: int) -> None:
         """MaAI-SDS と同じく、ASRエンジンを切り替えたら前のエンジンを止める（新しいものは「起動」で読み込む）。"""

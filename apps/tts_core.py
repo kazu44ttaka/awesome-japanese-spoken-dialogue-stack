@@ -49,7 +49,7 @@ DEVICE_SPECS: dict[str, dict] = {
 for _name in BACKENDS:
     _runtime = _name.partition("-")[0]
     if _runtime in ("crispasr", "audiocpp", "speechcpp"):
-        DEVICE_SPECS[_name] = {"label": "Device（speech.cpp の cuda は Vulkan）" if _runtime == "speechcpp" else "Device",
+        DEVICE_SPECS[_name] = {"label": "Device（cuda は Vulkan で GPU を使う）" if _runtime == "speechcpp" else "Device",
                                "choices": ["cuda", "cpu"], "default": "cuda"}
 DEVICE_CHOICES = {k: v["choices"] for k, v in DEVICE_SPECS.items()}
 FIXED_DEVICE: dict[str, str] = {
@@ -82,8 +82,8 @@ Emit = Callable[..., None]
 
 
 # 一覧は実行系ごとにまとめて出す（この順）
-ENGINE_GROUPS = ["エンジン・元の実装", "CrispASR", "audio.cpp", "speech.cpp（Vulkan）"]
-_PREFIX_GROUP = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp（Vulkan）"}
+ENGINE_GROUPS = ["エンジン・元の実装", "CrispASR", "audio.cpp", "speech.cpp"]
+_PREFIX_GROUP = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp"}
 _AUDIOCPP_ENGINES = {"supertonic_cpp", "qwen3_tts_cpp"}  # audio.cpp のサーバーを MaAI-SDS と同じ設定で動かすもの
 
 
@@ -188,6 +188,8 @@ class TtsSession:
                     self.tts, self.engine_name, self.device, self.voices = tts, name, device, voices
                 self.emit("voices", voices)
                 where = device or FIXED_DEVICE.get(name, "既定")
+                if name.startswith("speechcpp-") and where == "cuda":
+                    where = "vulkan"  # speech.cpp の GPU は Vulkan（ASR の表示と同じ）
                 note = ""
                 if isinstance(tts, VoicevoxCompatible) and tts.process is None:
                     note = "・前から動いていたエンジンを使用（デバイスはそのエンジンの起動のしかたのまま）"

@@ -3,13 +3,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue systems, with speed and accuracy measured per runtime on the same machine.
+ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue systems, with speed and accuracy measured per runtime on the same machine, and demo apps to try the models locally.
 
 [日本語](README.md)
 
 - **List**: Japanese support, streaming, license and runtimes for each model.
 - **Runtime comparison**: the same model run with its original implementation, sherpa-onnx, CrispASR, audio.cpp and speech.cpp, measured for speed, accuracy and memory. The same model can be several times faster depending on the runtime.
 - **Latency too**: time from the end of speech to the text, and time to the first audio, which matter in spoken dialogue.
+- **Try them locally**: every measured configuration can be tried in an ASR app that recognises your microphone and a TTS app that reads text aloud, including the choice of runtime, with the latency shown as you go ([apps/](apps/README.md)).
 
 ## Latest updates
 

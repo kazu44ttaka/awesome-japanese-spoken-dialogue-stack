@@ -136,7 +136,7 @@ TTS: dict[str, dict[str, dict]] = {
 }
 
 # アプリ（apps/）の一覧に出す名前
-RUNTIME_LABELS = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp・Vulkan"}
+RUNTIME_LABELS = {"crispasr": "CrispASR", "audiocpp": "audio.cpp", "speechcpp": "speech.cpp"}  # speech.cpp の GPU は Vulkan
 MODEL_LABELS = {
     # ASR
     "haas-ja": "Haas-ja v1.0", "reazonspeech-nemo-v2": "ReazonSpeech NeMo v2",
@@ -161,9 +161,11 @@ MODEL_LABELS = {
 }
 # 実行系のストリーミングをアプリの真のストリーミングとして使う構成（ほかはアプリの疑似ストリーミングで動かす）
 APP_STREAMING_ASR = {"audiocpp-nemotron-streaming", "audiocpp-voxtral-realtime", "crispasr-nemotron-streaming"}
+# アプリでは CPU だけで動かす構成（CrispASR 0.8.54 の Fun-ASR は、GPU では 2 回目の認識で落ちる。docs/runtimes.md）
+APP_CPU_ONLY = {"crispasr-fun-asr-nano", "crispasr-fun-asr-mlt-nano"}
 
 
-def label(runtime: str, key: str, spec: dict | None = None) -> str:
-    """アプリの一覧に出す名前。例: Haas-ja v1.0（speech.cpp・Vulkan）、Qwen3-TTS 0.6B Base（audio.cpp・クローン）"""
-    extra = "・クローン" if spec and spec.get("clone") else ""
+def label(runtime: str, key: str, spec: dict | None = None, note: str = "") -> str:
+    """アプリの一覧に出す名前。例: Haas-ja v1.0（speech.cpp）、Qwen3-TTS 0.6B Base（audio.cpp・クローン）"""
+    extra = ("・クローン" if spec and spec.get("clone") else "") + (f"・{note}" if note else "")
     return f"{MODEL_LABELS.get(key, key)}（{RUNTIME_LABELS.get(runtime, runtime)}{extra}）"

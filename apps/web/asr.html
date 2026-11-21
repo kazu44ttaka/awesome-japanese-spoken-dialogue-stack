@@ -135,6 +135,8 @@ function syncDevice() {
   const fixed = m.gpu && m.cpu ? null : (m.gpu ? 'cuda' : 'cpu');  // CPU だけ・GPU だけのモデルは固定する
   if (fixed) $('device').value = fixed;
   $('device').disabled = !!fixed;
+  $('device').title = fixed === 'cuda' ? 'このモデルは GPU でしか動かない' : fixed === 'cpu' ? 'このモデルは CPU で動かす'
+    : m.name.startsWith('speechcpp-') ? 'cuda を選ぶと Vulkan で GPU を使う' : '';
 }
 function setOptions(o) {
   $('pseudo').checked = !!o.pseudo;
