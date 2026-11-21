@@ -16,6 +16,7 @@
 #   bench       測定結果のあるページ（benchmarks/ 以下）。無ければ省略
 #   cer         ASR の読みの CER [FLEURS, ReazonSpeech, Common Voice, 会話]。測っていないものは nan
 #   tts_ms / tts_cer / utmos / first_voice_ms  TTS の 1 文の合成時間（GPU）・読みの CER・UTMOS・最初の声までの時間（中央値）
+#   overlap     評価データで学習しているもの（"fleurs" / "reazonspeech" / "cv"）。表で † を付け、太字のいちばんよい値から外す
 #   measured / measured_en  上の値を測った構成（実行系など）
 #   note_ja / note_en  一言メモ
 
@@ -67,6 +68,7 @@ license = "CC-BY-4.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.038, 0.092, 0.023, 0.122]
+overlap = ["reazonspeech"]
 measured = "NeMo"
 measured_en = "NeMo"
 note_ja = "GPU 約 40〜55 ms・CPU 約 180 ms。疑似ストリーミングで文字が出るまで 約 70 ms と最も速い"
@@ -139,6 +141,7 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
 cer = [0.038, 0.039, 0.033, 0.160]
+overlap = ["reazonspeech"]
 measured = "NeMo"
 measured_en = "NeMo"
 note_ja = "放送の話し言葉に強い。speech.cpp で 1 発話 約 100 ms（NeMo は 約 350 ms）"
@@ -156,6 +159,7 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.036, 0.025, 0.024, 0.147]
+overlap = ["reazonspeech"]
 measured = "sherpa-onnx"
 measured_en = "sherpa-onnx"
 note_ja = "CPU で 約 90 ms と速い。ReazonSpeech で 1 位（同じコーパスで学習）。音声がいきなり始まると最初の語を落とすので、先頭に無音を足す"
@@ -172,9 +176,9 @@ size = "0.6B"
 license = "OpenMDW-1.1"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
-cer = [0.084, 0.210, 0.098, 0.176]
-measured = "sherpa-onnx・560 ms"
-measured_en = "sherpa-onnx, 560 ms"
+cer = [0.067, 0.203, 0.099, nan]
+measured = "NeMo（GPU）"
+measured_en = "NeMo (GPU)"
 note_ja = "真のストリーミング（80 / 560 ms チャンク）。精度は低めで、短い発話を落とすことがある。文字が出るまで 0.5〜0.8 秒"
 note_en = "True streaming (80/560 ms chunks). Lower accuracy and may drop short utterances. Text appears 0.5-0.8 s after each phoneme"
 
@@ -190,8 +194,9 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-08-jsut20.md"
 cer = [0.040, 0.111, 0.033, nan]
-measured = "faster-whisper・int8・beam 5"
-measured_en = "faster-whisper, int8, beam 5"
+overlap = ["reazonspeech"]
+measured = "faster-whisper・int8・beam 5（ほかは beam 1）・先頭に 0.5 秒の無音"
+measured_en = "faster-whisper, int8, beam 5 (others use beam 1), 0.5 s leading silence"
 note_ja = "日本語特化の蒸留 Whisper。MaAI-SDS の設定（先頭に 0.5 秒の無音）。GPU 約 175 ms"
 note_en = "Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU"
 
@@ -256,6 +261,7 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.031, 0.072, 0.014, 0.168]
+overlap = ["reazonspeech", "cv"]
 measured = "Transformers"
 measured_en = "Transformers"
 note_ja = "GPU で 1 発話 16 ms と最も速い。CPU は float32 で 約 320 ms（bfloat16 のままだと 約 6 秒）。読点をほぼ出さない"
@@ -291,6 +297,7 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.025, 0.038, 0.007, 0.128]
+overlap = ["reazonspeech", "cv"]
 measured = "haas-asr"
 measured_en = "haas-asr"
 note_ja = "3 つの評価データの平均順位で 1 位・GPU 約 40 ms。ReazonSpeech と Common Voice で学習しているので、その 2 つは有利"
@@ -309,6 +316,7 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.036, 0.095, 0.017, 0.201]
+overlap = ["reazonspeech", "cv"]
 measured = "Transformers"
 measured_en = "Transformers"
 note_ja = "LLM 型で GPU でも 約 1.2 秒（CrispASR の Q4_K で 約 460 ms）。Common Voice で学習"
@@ -326,8 +334,9 @@ license = "Apache-2.0"
 commercial = "yes"
 bench = "benchmarks/2026-11-runtimes.md"
 cer = [0.060, 0.085, 0.059, 0.190]
-measured = "CrispASR・Q4_K"
-measured_en = "CrispASR, Q4_K"
+overlap = ["reazonspeech", "cv"]
+measured = "CrispASR・Q4_K（ほかは Q8_0 か元の精度）"
+measured_en = "CrispASR, Q4_K (others use Q8_0 or full precision)"
 note_ja = "1 発話 約 480 ms。同じ句をくり返すことがある"
 note_en = "~480 ms per utterance. Sometimes loops on a phrase"
 
@@ -400,6 +409,7 @@ license = "MIT"
 commercial = "yes"
 bench = "benchmarks/asr/2026-11-3sets.md"
 cer = [0.043, 0.191, 0.036, 0.145]
+overlap = ["reazonspeech"]
 measured = "Transformers"
 measured_en = "Transformers"
 note_ja = "アニメ・ゲームの台詞で追加学習した Kotoba-Whisper。会話では元と同じくらい、放送の話し言葉では悪い。CrispASR の変換版は大きく悪い"

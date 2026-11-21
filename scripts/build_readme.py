@@ -97,6 +97,8 @@ SCORES = {
     "asr": [("cer", i, 3, min) for i in range(4)],
     "tts": [("tts_ms", None, 0, min), ("tts_cer", None, 3, min), ("utmos", None, 2, max), ("first_voice_ms", None, 0, min)],
 }
+# ASR の列と評価データの対応（overlap に入っている評価データの値には † を付ける）
+OVERLAP_KEYS = {"asr": ["fleurs", "reazonspeech", "cv", None]}
 
 
 def _score(row: dict, field: str, idx: int | None) -> float | None:
@@ -111,17 +113,20 @@ def _score_cells(rows: list[dict], kind: str | None) -> list[list[str]]:
     if not kind:
         return [[] for _ in rows]
     cols = []
-    for field, idx, nd, better in SCORES[kind]:
+    keys = OVERLAP_KEYS.get(kind, [None] * len(SCORES[kind]))
+    for (field, idx, nd, better), key in zip(SCORES[kind], keys):
         vals = [_score(r, field, idx) for r in rows]
-        known = [v for v in vals if v is not None]
+        dagger = [bool(key) and key in r.get("overlap", []) for r in rows]
+        # いちばんよい値は、評価データで学習していないものから選ぶ
+        known = [v for v, d in zip(vals, dagger) if v is not None and not d]
         best = round(better(known), nd) if known else None
         cells = []
-        for v in vals:
+        for v, d in zip(vals, dagger):
             if v is None:
                 cells.append("—")
             else:
-                text = f"{v:.{nd}f}"
-                cells.append(f"**{text}**" if round(v, nd) == best else text)
+                text = f"{v:.{nd}f}" + ("†" if d else "")
+                cells.append(f"**{text}**" if not d and round(v, nd) == best else text)
         cols.append(cells)
     return [list(c) for c in zip(*cols)]
 

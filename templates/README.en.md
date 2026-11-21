@@ -36,8 +36,8 @@ First choices based on our measurements. Check the license column below before c
 
 | Goal | Pick | Why |
 |---|---|---|
-| Fast, accurate ASR on GPU | Haas-ja v1.0, Parakeet TDT-CTC 0.6B ja | ~40 ms per utterance; Haas has the best average rank on our three test sets ([ASR accuracy](benchmarks/asr/2026-11-3sets.md)) |
-| ASR on CPU only | ReazonSpeech k2-v2 | ~90 ms per utterance, CER 0.024-0.036 ([latency](benchmarks/asr/2026-11-timing.md)) |
+| Fast, accurate ASR on GPU | Haas-ja v1.0, Parakeet TDT-CTC 0.6B ja | ~40 ms per utterance; on held-out FLEURS, Haas 0.025 and Parakeet 0.038 ([ASR accuracy](benchmarks/asr/2026-11-3sets.md)) |
+| ASR on CPU only | ReazonSpeech k2-v2 | ~90 ms per utterance, CER 0.036 on FLEURS ([latency](benchmarks/asr/2026-11-timing.md)) |
 | Casual conversation | Qwen3-ASR 1.7B (speech.cpp) | Best CER on free two-person conversation (0.091) ([conversation](benchmarks/asr/2026-11-3sets.md#会話magichub-の自由会話)) |
 | Text while the user is still speaking | Pseudo-streaming Parakeet TDT-CTC or Haas-ja | Text appears ~60-130 ms after each phoneme; true-streaming Nemotron takes 0.5-0.8 s ([streaming](benchmarks/2026-11-runtimes.md#ストリーミング)) |
 | Fast TTS | VOICEVOX (voicevox_core), Supertonic 3 (audio.cpp) | ~50 ms and ~90 ms per sentence on GPU ([TTS](benchmarks/tts/2026-11-tts.md)) |
@@ -45,11 +45,11 @@ First choices based on our measurements. Check the license column below before c
 | Voice from a text description | Irodori-TTS v4.1 (audio.cpp) | ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
 | Fast first reply from the LLM | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms and 45 ms to the first token ([LLM](benchmarks/llm/2026-11-lmstudio.md)) |
 
-**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The numbers come from the configuration shown as "values:" in the notes. Bold marks the best value in each column; "—" means not measured. The benchmark pages are in Japanese.
+**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The numbers come from the configuration shown as "values:" in the notes; "—" means not measured. The benchmark pages are in Japanese.
 
 ## ASR
 
-The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER on each test set (read speech, TV broadcasts, crowd-sourced read speech and free two-person conversation; [details](benchmarks/asr/2026-11-3sets.md)). "Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
+The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER on each test set (read speech, TV broadcasts, crowd-sourced read speech and free two-person conversation; [details](benchmarks/asr/2026-11-3sets.md)). **†** means the model card lists that test set (or data from the same source) in training, so the score is favourable. Bold marks the best value without †. Conversation segments are padded with 0.5 s of silence on both ends, which helps some models and hurts others. "Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
 
 <!-- table:asr -->
 
@@ -59,7 +59,7 @@ The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER 
 
 ## TTS
 
-ms/sentence is the mean synthesis time over 20 sentences; Reading CER is the median over three ASR transcriptions of the audio; UTMOS estimates naturalness (1-5; trained on English, so treat it as a guide); First audio ms is the median time to the first audio when streaming ([details](benchmarks/2026-11-runtimes.md#tts)). "Streaming" yes means audio can start before the whole sentence is synthesised.
+ms/sentence is the mean synthesis time over 20 sentences; Reading CER is the median over three ASR transcriptions of the audio; UTMOS estimates naturalness (1-5; trained on English, so treat it as a guide; it reflects the chosen voice more than the model, and cloning models all use the same reference, whose own recording scores 3.52); First audio ms is the median time to the first audio when streaming ([details](benchmarks/2026-11-runtimes.md#tts)). Bold marks the best value in each column. "Streaming" yes means audio can start before the whole sentence is synthesised.
 
 <!-- table:tts -->
 
