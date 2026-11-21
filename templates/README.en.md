@@ -1,4 +1,4 @@
-# Awesome Japanese Spoken Dialogue Stack [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
+# Awesome Japanese Spoken Dialogue Stack
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
