@@ -1,6 +1,6 @@
-# awesome-japanese-speech
+# awesome-japanese-spoken-dialogue-component
 
-A curated list of **Japanese speech recognition (ASR), speech synthesis (TTS) and LLMs**, plus the models around spoken dialogue (voice activity detection, turn-taking, backchannels).
+A curated list of components for building Japanese spoken dialogue systems: **speech recognition (ASR), speech synthesis (TTS) and LLMs**, plus the models around them (voice activity detection, turn-taking, backchannels).
 
 [日本語](README.md)
 

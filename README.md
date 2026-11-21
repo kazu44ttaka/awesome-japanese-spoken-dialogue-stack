@@ -1,7 +1,7 @@
 <!-- このファイルは scripts/build_readme.py が templates/ と data/models.toml から作る。直接編集しない。 -->
-# awesome-japanese-speech
+# awesome-japanese-spoken-dialogue-component
 
-日本語の **音声認識（ASR）・音声合成（TTS）・LLM** と、音声対話に使う周辺モデル（発話区間検出・ターンテイキング・相槌）をまとめた一覧です。
+日本語の音声対話システムを作るための部品、**音声認識（ASR）・音声合成（TTS）・LLM** と周辺モデル（発話区間検出・ターンテイキング・相槌）をまとめた一覧です。
 
 [English](README.en.md)
 

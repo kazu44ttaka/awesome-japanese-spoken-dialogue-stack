@@ -88,7 +88,7 @@ unzip speech.zip              # → speech.exe・speech.dll
 `SPEECH_MODEL_DIR` で変える。
 
 ```bash
-export SPEECH_MODEL_DIR=D:/awesome-japanese-speech/models/speechcpp
+export SPEECH_MODEL_DIR="$PWD/models/speechcpp"
 ```
 
 - 既定の `--device auto` は「最初の GPU」なので、Intel の内蔵 GPU がある PC ではそちら（`Vulkan0`）で動く。
