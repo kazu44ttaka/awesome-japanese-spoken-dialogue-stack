@@ -38,6 +38,14 @@ ASR: dict[str, dict[str, dict]] = {
                            "url": "https://huggingface.co/cstr/granite-speech-4.0-1b-GGUF/resolve/main/granite-speech-4.0-1b-q4_k.gguf"},
         # CrispASR の配布は Q4_K だけ。同じ句をくり返して止まらない発話がある
         "granite-4.1-2b": {"backend": "granite-4.1", "quant": None},
+        # Granite 4.1 の別版（2026-11-21 に追加。日本語で使えるかは測って確かめる）
+        "granite-4.1-plus": {"backend": "granite-4.1-plus", "quant": None},
+        "granite-4.1-nar": {"backend": "granite-4.1-nar", "quant": None},
+        # CrispASR の作者が配る日本語版の GGUF（F16。トークナイザーは別ファイル）
+        "moonshine-tiny-ja": {"backend": "moonshine", "language": "auto", "url": "https://huggingface.co/cstr/moonshine-tiny-ja-GGUF/resolve/main/moonshine-tiny-ja.gguf",
+                              "prefetch": ["https://huggingface.co/cstr/moonshine-tiny-ja-GGUF/resolve/main/tokenizer.bin"]},
+        "moonshine-base-ja": {"backend": "moonshine", "language": "auto", "url": "https://huggingface.co/cstr/moonshine-base-ja-GGUF/resolve/main/moonshine-base-ja.gguf",
+                              "prefetch": ["https://huggingface.co/cstr/moonshine-base-ja-GGUF/resolve/main/tokenizer.bin"]},
         "voxtral-realtime": {"backend": "voxtral4b"},
         "nemotron-streaming": {"backend": "nemotron", "quant": None},  # CrispASR の配布は F16 だけ
         # 長い録音向けのモデル。短い発話では英語の文や [Music] などを出し、読みの CER は 0.98
@@ -69,6 +77,7 @@ ASR: dict[str, dict[str, dict]] = {
         # granite5asr_q8_0 は日本語に対応する前の英語だけの重みとみられる（日本語の音声に "what" などを出す）ので測らない
         "voxtral-realtime": {"family": "voxtral_realtime", "package": "voxtral_realtime_q8_0"},
         "nemotron-streaming": {"family": "nemotron_asr", "package": "nemotron_asr_q8_0", "language": "ja-JP"},
+        "lfm2.5-audio-jp": {"family": "lfm2_audio", "package": "lfm2_audio_1_5b_jp_q8_0"},
         # vibevoice_asr_q8_0 は 1 発話目の応答が返らず時間切れになったので測らない
     },
 }
@@ -80,6 +89,8 @@ TTS: dict[str, dict[str, dict]] = {
         "qwen3-tts-0.6b-base": {"backend": "qwen3-tts", "clone": True, "ref_24k": True},
         "qwen3-tts-0.6b-customvoice": {"backend": "qwen3-tts-customvoice", "voices": ["ono_anna"]},
         "qwen3-tts-1.7b-base": {"backend": "qwen3-tts-1.7b-base", "clone": True, "ref_24k": True},
+        # 声を文章で指定する版。声の説明は instructions で渡す（どの構成も同じ説明）
+        "qwen3-tts-1.7b-voicedesign": {"backend": "qwen3-tts-1.7b-voicedesign", "options": {"instructions": "落ち着いた若い女性の声で、はっきりと自然に話す"}},
         "qwen3-tts-1.7b-customvoice": {"backend": "qwen3-tts-1.7b-customvoice", "voices": ["ono_anna"]},
         # CrispASR は LLM の温度の既定が 0（貪欲）で、20 文中 3 文が止まらず 30 秒まで伸びた。
         # モデルの既定（audio.cpp と同じ 0.8）に合わせる
@@ -103,6 +114,8 @@ TTS: dict[str, dict[str, dict]] = {
     "speechcpp": {
         "qwen3-tts-0.6b-customvoice": {"model": "qwen3-tts-0.6b", "voices": ["ono_anna"]},
         "qwen3-tts-1.7b-customvoice": {"model": "qwen3-tts-1.7b", "voices": ["ono_anna"]},
+        # speech.cpp の qwen3-tts-0.6b は CustomVoice 版で、録音から声を作れない（「takes no voices made from recordings」）。
+        # Base 版は配布されていないので、speech.cpp では声のクローンを測れない
         "irodori-tts-v4-small": {"model": "irodori-tts", "voices": ["none"]},  # none = 参照音声なし
         "irodori-tts-v4-small-mf": {"model": "irodori-tts-mf", "voices": ["none"]},
         "irodori-tts-large": {"model": "irodori-tts-large", "voices": ["none"]},
@@ -112,6 +125,12 @@ TTS: dict[str, dict[str, dict]] = {
         "qwen3-tts-1.7b-base": {"family": "qwen3_tts", "package": "qwen3_tts_1_7b_base_q8_0", "clone": True},
         "qwen3-tts-1.7b-customvoice": {"family": "qwen3_tts", "package": "qwen3_tts_1_7b_customvoice_q8_0",
                                        "voices": ["ono_anna"]},
+        "qwen3-tts-1.7b-voicedesign": {"family": "qwen3_tts", "package": "qwen3_tts_1_7b_voicedesign_q8_0",
+                                       "options": {"instructions": "落ち着いた若い女性の声で、はっきりと自然に話す"}},
+        "kitten-tts-2": {"family": "kitten_tts2", "package": "kitten_tts2_20261021_q8_0", "voices": ["JapaneseAnimeHeroine"]},
+        "lfm2.5-audio-jp": {"family": "lfm2_audio", "package": "lfm2_audio_1_5b_jp_q8_0"},
+        "zonos3-mini": {"family": "zonos3", "package": "zonos3_mini_ptq", "file": "backbone-ptq.gguf"},
+        "kokoro-82m": {"family": "kokoro_tts", "package": "kokoro_82m_q8_0", "voices": ["jf_alpha"]},
         "irodori-tts-v4-small": {"family": "irodori_tts", "package": "irodori_tts_v4_small_q8_0"},
         "irodori-tts-v4-small-mf": {"family": "irodori_tts", "package": "irodori_tts_v4_1_small_mf_q8_0"},
         "irodori-tts-v4-anime": {"family": "irodori_tts", "package": "irodori_tts_v4_1_anime_q8_0"},
@@ -158,6 +177,10 @@ MODEL_LABELS = {
     "irodori-tts-v4-small-mf": "Irodori-TTS v4.1 Small MF", "irodori-tts-v4-anime": "Irodori-TTS v4.1 Anime",
     "irodori-tts-large": "Irodori-TTS Large", "fish-s2-pro": "Fish Audio S2 Pro", "higgs-audio-v3-4b": "Higgs Audio TTS 3 4B",
     "outetts-1.0-1b": "OuteTTS 1.0 1B",
+    "moonshine-tiny-ja": "Moonshine tiny-ja", "moonshine-base-ja": "Moonshine base-ja",
+    "granite-4.1-plus": "Granite Speech 4.1 2B Plus", "granite-4.1-nar": "Granite Speech 4.1 2B NAR",
+    "qwen3-tts-1.7b-voicedesign": "Qwen3-TTS 1.7B VoiceDesign", "qwen3-tts-0.6b-clone": "Qwen3-TTS 0.6B",
+    "kitten-tts-2": "Kitten TTS 2", "zonos3-mini": "ZONOS3-Mini", "kokoro-82m": "Kokoro-82M",
 }
 # 実行系のストリーミングをアプリの真のストリーミングとして使う構成（ほかはアプリの疑似ストリーミングで動かす）
 APP_STREAMING_ASR = {"audiocpp-nemotron-streaming", "audiocpp-voxtral-realtime", "crispasr-nemotron-streaming"}

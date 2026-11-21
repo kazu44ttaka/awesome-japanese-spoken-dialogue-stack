@@ -49,7 +49,10 @@ def main() -> None:
         config.setdefault(args.engine, {})[key] = value
     engine = create(args.engine, config)
     if hasattr(engine, "start_engine") and not engine.available():
-        engine.start_engine(use_gpu=True)  # AivisSpeech / VOICEVOX は入っていれば GPU で起動する
+        # AivisSpeech / VOICEVOX は入っていれば起動する（--set device=cpu なら CPU で、cpu_num_threads を付けて）
+        sec = config.get(args.engine, {})
+        on_cpu = str(sec.get("device", "")).lower() == "cpu"
+        engine.start_engine(use_gpu=not on_cpu, cpu_num_threads=int(sec["cpu_num_threads"]) if sec.get("cpu_num_threads") else None)
     if hasattr(engine, "available") and not engine.available():
         raise SystemExit(f"{args.engine} を使えません")
     voice = args.voice if args.voice is not None else engine.voices()[0][0]

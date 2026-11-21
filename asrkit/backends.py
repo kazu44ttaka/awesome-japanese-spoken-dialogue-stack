@@ -182,10 +182,12 @@ class VenvASR:
     いまの環境に haas_asr / nemo が無いときはこれで動かす（デモアプリから選べるように）。
     """
 
-    def __init__(self, name: str, python: Path, device: str = "cuda") -> None:
+    def __init__(self, name: str, python: Path, device: str = "cuda", threads: int | None = None) -> None:
         import json
 
         env = dict(os.environ, PYTHONIOENCODING="utf-8", HF_HUB_DISABLE_PROGRESS_BARS="1")
+        if threads and device == "cpu":  # 別の環境の PyTorch も CPU のスレッド数をそろえる
+            env["OMP_NUM_THREADS"] = env["MKL_NUM_THREADS"] = str(threads)
         # 親の環境の Python を指す変数を引き継ぐと、版の違う子の Python が親の標準ライブラリを読んで落ちる
         for key in ("__PYVENV_LAUNCHER__", "PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
             env.pop(key, None)
@@ -734,7 +736,7 @@ def create(name: str, device: str = "cpu", threads: int = 8, model_dir: Path | N
 
         module, python = _VENV_MODELS[name]
         if importlib.util.find_spec(module) is None and python.is_file():
-            return VenvASR(name, python, device)
+            return VenvASR(name, python, device, threads)
     if name in table:
         return table[name]()
     if name.startswith("sherpa-"):

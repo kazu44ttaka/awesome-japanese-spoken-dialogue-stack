@@ -45,16 +45,22 @@ ASR_GROUPS = [
                            ("crispasr-cohere-transcribe", "", "Q4_K")]),
     ("Cohere ASR ja v0.1", [("crispasr-cohere-asr-ja-v0.1", "", "")]),
     ("Granite 4.0 1B Speech", [("granite-4.0-1b", "transformers", ""), ("crispasr-granite-4.0-1b", "", "Q4_K")]),
-    ("Granite 4.1 2B Speech", [("crispasr-granite-4.1-2b", "", "Q4_K・※3")]),
+    ("Granite 4.1 2B Speech", [("crispasr-granite-4.1-2b", "", "Q4_K・※3"), ("crispasr-granite-4.1-plus", "", "Plus 版"),
+                               ("crispasr-granite-4.1-nar", "", "NAR 版。日本語に非対応（ローマ字の断片を出す）")]),
     ("Voxtral Mini 4B Realtime", [("voxtral-realtime", "transformers", ""), ("audiocpp-voxtral-realtime", "", ""),
                                   ("crispasr-voxtral-realtime", "", "")]),
     ("Nemotron 3.5 ASR streaming 0.6B", [("nemotron-nemo", "NeMo", ""), ("nemotron-560ms", "sherpa-onnx（int8・560 ms）", ""),
+                                         ("nemotron-80ms", "sherpa-onnx（int8・80 ms）", ""),
                                          ("audiocpp-nemotron-streaming", "", ""),
                                          ("crispasr-nemotron-streaming", "", "F16")]),
     ("Whisper large-v3-turbo", [("whisper-large-v3-turbo", "transformers", ""),
                                 ("faster-whisper", "faster-whisper（CTranslate2）", ""),
                                 ("crispasr-whisper-large-v3-turbo", "", "whisper.cpp の ggml")]),
-    ("LFM2.5-Audio-1.5B-JP", [("crispasr-lfm2.5-audio-jp", "", "Q5_K・※3")]),
+    ("LFM2.5-Audio-1.5B-JP", [("crispasr-lfm2.5-audio-jp", "", "Q5_K・※3"), ("audiocpp-lfm2.5-audio-jp", "", "Q8_0。CrispASR のような繰り返しは出ない")]),
+    ("Moonshine tiny-ja", [("moonshine-tiny-ja", "transformers", ""), ("crispasr-moonshine-tiny-ja", "", "F16・言語は auto で渡す")]),
+    ("Moonshine base-ja", [("moonshine-base-ja", "transformers", ""), ("crispasr-moonshine-base-ja", "", "F16・言語は auto で渡す")]),
+    ("anime-whisper", [("anime-whisper", "transformers", ""), ("anime-whisper-faster", "faster-whisper（有志の CTranslate2 変換）", ""),
+                       ("crispasr-anime-whisper", "", "有志の whisper.cpp 変換")]),
 ]
 
 TTS_GROUPS = [
@@ -96,6 +102,12 @@ TTS_GROUPS = [
     ("Style-Bert-VITS2 JP-Extra", [("style-bert-vits2", "Style-Bert-VITS2（PyTorch）", "声は jvnv-F1-jp"),
                                    ("aivisspeech", "AivisSpeech（ONNX）", "同じ系統。声は別のモデル（既定の声）")]),
     ("GPT-SoVITS v2ProPlus（クローン）", [("gpt-sovits", "GPT-SoVITS（PyTorch）", "")]),
+    ("Qwen3-TTS 1.7B VoiceDesign（声を文章で指定）", [("audiocpp-qwen3-tts-1.7b-voicedesign", "", "説明：落ち着いた若い女性の声"),
+                                                 ("crispasr-qwen3-tts-1.7b-voicedesign", "", "同じ説明")]),
+    ("Kitten TTS 2", [("kitten", "kittenml（PyTorch）", "JapaneseAnimeHeroine"),
+                      ("audiocpp-kitten-tts-2", "", "同じ声。ストリーミングは非対応")]),
+    ("LFM2.5-Audio-1.5B-JP（TTS）", [("lfm_audio", "liquid-audio（PyTorch）", ""), ("audiocpp-lfm2.5-audio-jp", "", "")]),
+    ("ZONOS3-Mini", [("zonos3", "ZONOS3 の ggml サーバー", ""), ("audiocpp-zonos3-mini", "", "")]),
 ]
 
 

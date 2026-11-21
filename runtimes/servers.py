@@ -263,6 +263,8 @@ def create_asr(runtime: str, key: str, device: str = "cuda", threads: int = 8, *
 
     spec = ASR[runtime][key]
     if runtime == "crispasr":
+        for u in spec.get("prefetch", []):  # サーバーが自分では取ってこない付属のファイル（トークナイザーなど）
+            fetch(u, CRISPASR_CACHE)
         server, url = start_crispasr(spec["backend"], spec.get("model", "auto"), device, threads, spec.get("args"),
                                      url=spec.get("url"), quant=spec.get("quant", "q8_0"),
                                      language=spec.get("language", "ja"))
@@ -273,6 +275,8 @@ def create_asr(runtime: str, key: str, device: str = "cuda", threads: int = 8, *
     elif runtime == "audiocpp":
         model = key
         path = audiocpp_install(spec["package"])
+        if spec.get("file"):
+            path = path / spec["file"]
         server, url = start_audiocpp([{"id": key, "family": spec["family"], "path": str(path),
                                        "task": "asr", "mode": "offline", **spec.get("load", {})}], device, threads)
     else:
@@ -320,10 +324,13 @@ def create_tts(runtime: str, key: str, device: str = "cuda", threads: int = 8, m
         model = spec["backend"]
         options.setdefault("language", spec.get("language", "ja"))
     elif runtime == "speechcpp":
-        server, url = start_speechcpp([spec["model"]], device, threads, ["--language", "ja", *spec.get("args", [])])
+        extra = ["--add-voice", f"ref={REF_WAV_24K}"] if spec.get("add_ref_voice") else []  # 参照音声を声 ref として足す
+        server, url = start_speechcpp([spec["model"]], device, threads, ["--language", "ja", *extra, *spec.get("args", [])])
         model = ""
     elif runtime == "audiocpp":
         path = audiocpp_install(spec["package"])
+        if spec.get("file"):
+            path = path / spec["file"]
         model = key
         entry = {"id": key, "family": spec["family"], "path": str(path), "task": "tts", "mode": mode,
                  **spec.get("load", {})}

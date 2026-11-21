@@ -17,3 +17,6 @@ data/smoke_*
 data/bench_tts_list.txt
 data/.*.lock/
 data/stream_test*.txt
+data/*.err
+data/*.out
+data/power_guard.*

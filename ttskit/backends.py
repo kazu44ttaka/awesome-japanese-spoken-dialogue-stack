@@ -173,14 +173,16 @@ class VoicevoxCompatible:
         except Exception:  # noqa: BLE001
             return False
 
-    def start_engine(self, use_gpu: bool = True, wait_sec: float = 90.0) -> bool:
+    def start_engine(self, use_gpu: bool = True, wait_sec: float = 90.0, cpu_num_threads: int | None = None) -> bool:
         """既定のインストール先のエンジンを起動し、応答するまで待つ（use_gpu で --use_gpu を付ける）。"""
         if self.available():
             return True
         exe = next((p for p in self.exe_candidates if p.is_file()), None)
         if exe is None:
             return False
-        self.process = subprocess.Popen([str(exe), *(["--use_gpu"] if use_gpu else [])], cwd=str(exe.parent),
+        args = [str(exe), *(["--use_gpu"] if use_gpu else []),
+                *(["--cpu_num_threads", str(cpu_num_threads)] if cpu_num_threads else [])]
+        self.process = subprocess.Popen(args, cwd=str(exe.parent),
                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         deadline = time.monotonic() + wait_sec
@@ -234,6 +236,8 @@ class Mio:
                                 "--tts-wavlm-model", str(_path(self.cfg["wavlm"])), "--port", str(port),
                                 # 既定の 768 では長い文（参照 + 生成 800 トークン）が入らず 400 になる
                                 "--ctx-size", str(int(self.cfg.get("ctx_size", 2048))),
+                                *(["-ngl", str(self.cfg["ngl"])] if "ngl" in self.cfg else []),
+                                *(["--threads", str(self.cfg["threads"])] if "threads" in self.cfg else []),
                                 "--reference-file-json", json.dumps(refs)], cwd=exe.parent,
                                dll_dirs=self.cfg.get("dll_dirs"))
         return self.server.alive()
