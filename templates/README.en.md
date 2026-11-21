@@ -10,7 +10,7 @@ A curated list of **Japanese speech recognition (ASR), speech synthesis (TTS) an
 - **Broad coverage**: most of the main ASR and TTS models usable for Japanese have **numbers measured on the same machine under the same conditions** (character error rate, latency, RTF, memory) together with the scripts, in [benchmarks/](benchmarks/).
 - Written with spoken dialogue systems in mind, so **latency matters as much as accuracy**.
 
-> Always check the official license of each model. "TBD" means we have not verified it yet.
+> Licenses were checked against each official page (model card, repository and license text) on 2026-11-21. They can change, so always check the official page before use. "conditional" means commercial use is allowed under conditions such as a revenue cap; "unknown" means no license is stated.
 > The "Commercial" column is a hint, not legal advice.
 
 ## Contents
@@ -88,6 +88,10 @@ Method and test machine: [benchmarks/README.md](benchmarks/README.md).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The tables are generated from `data/models.toml`; do not edit the README directly.
+
+## License
+
+This repository (the list, benchmark results and code) is MIT-licensed ([LICENSE](LICENSE)). The listed models and datasets follow their own licenses.
 
 ## Related
 
