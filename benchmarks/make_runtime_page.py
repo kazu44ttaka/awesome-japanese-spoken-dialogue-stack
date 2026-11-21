@@ -183,21 +183,21 @@ STREAM_ASR = [
         ("nemotron-560ms", "sherpa-onnx（int8・560 ms・CPU）", "", "真のストリーミング"),
         ("nemotron-nemo", "NeMo（560 ms・GPU）", "nemotron-nemo", "真のストリーミング"),
         ("audiocpp-nemotron-streaming", "", "audiocpp-nemotron-streaming", "真のストリーミング"),
-        ("crispasr-nemotron-streaming", "", "crispasr-nemotron-streaming", "0.5 秒ごとに全体を認識し直す")]),
+        ("crispasr-nemotron-streaming", "", "crispasr-nemotron-streaming", "真のストリーミング")]),
     ("Voxtral Mini 4B Realtime", [("audiocpp-voxtral-realtime", "", "audiocpp-voxtral-realtime", "80 ms ずつ")]),
     ("Haas-ja v1.0", [
         ("audiocpp-haas-ja", "", "audiocpp-haas-ja", "2 秒の窓で認識し直す（右に 2 秒待つ）"),
         ("speechcpp-haas-ja", "", "speechcpp-haas-ja", "0.2 秒ごとに頭から認識し直す"),
-        ("crispasr-haas-ja", "", "crispasr-haas-ja", "0.5 秒ごとに全体を認識し直す")]),
+        ("crispasr-haas-ja", "", "crispasr-haas-ja", "途中経過なし（終わりを送ってから 1 回認識）")]),
     ("ReazonSpeech NeMo v2", [("speechcpp-reazonspeech-nemo-v2", "", "speechcpp-reazonspeech-nemo-v2", "0.2 秒ごとに頭から")]),
     ("Parakeet TDT-CTC 0.6B ja", [("speechcpp-parakeet-tdt-ctc-0.6b-ja", "", "speechcpp-parakeet-tdt-ctc-0.6b-ja", "0.2 秒ごとに頭から")]),
     ("Qwen3-ASR 0.6B", [
         ("audiocpp-qwen3-asr-0.6b", "", "audiocpp-qwen3-asr-0.6b", "既定の 30 秒の窓"),
         ("speechcpp-qwen3-asr-0.6b", "", "speechcpp-qwen3-asr-0.6b", "0.2 秒ごとに頭から"),
-        ("crispasr-qwen3-asr-0.6b", "", "crispasr-qwen3-asr-0.6b", "0.5 秒ごとに全体を")]),
+        ("crispasr-qwen3-asr-0.6b", "", "crispasr-qwen3-asr-0.6b", "途中経過なし（終わりを送ってから 1 回認識）")]),
     ("SenseVoiceSmall", [
         ("audiocpp-sensevoice", "", "audiocpp-sensevoice", "窓ごと"),
-        ("crispasr-sensevoice", "", "crispasr-sensevoice", "0.5 秒ごとに全体を")]),
+        ("crispasr-sensevoice", "", "crispasr-sensevoice", "途中経過なし（終わりを送ってから 1 回認識）")]),
 ]
 
 # ストリーミングの TTS。(構成, 実行系の表示, 注)
@@ -213,6 +213,9 @@ def stream_asr_table() -> str:
             if not d:
                 continue
             off = load("timing_gpu", f"{offline}.json") if offline else None
+            n_to = d.get("timeouts") or 0
+            if n_to:  # 確定した文字が返らなかった発話がある（CER は返らなかった発話を空として数えた参考の値）
+                note += f"。{d['count']} 発話中 {n_to} 発話で確定した文字が返らなかった（CER は参考）"
             out.append(f"| {model} | {runtime_label(name, label)} | {d['p50_final_lag_ms']:.0f} / {d['p95_final_lag_ms']:.0f} "
                        f"| {d['partial_before_end'] * 100:.0f}% | {cer(d)} | {ms(off)} | {note} |")
     return "\n".join(out) + "\n"
@@ -255,6 +258,10 @@ def stream_tts_table() -> str:
             if not d:
                 continue
             off = load("tts", f"{name}.json")
+            # 最初の声が全部届くまでの半分より早ければ、作りながら逐次に送っている
+            fv, tot = d.get("mean_first_voice_ms"), d.get("mean_total_ms")
+            how = "" if not fv or not tot else ("逐次に届く" if fv < tot * 0.5 else "ほぼまとめて届く")
+            note = "・".join(x for x in (how, note) if x)
             out.append(f"| {model} | {runtime_label(name, label)} | {ms(d, 'p50_first_chunk_ms')} | "
                        f"{ms(d, 'p50_first_voice_ms')} / {ms(d, 'mean_first_voice_ms')} | {ms(d, 'mean_total_ms')} | "
                        f"{ms(off, 'mean_synth_ms')} | {note} |")

@@ -173,7 +173,13 @@ def run_one(s, audio: np.ndarray) -> dict:
         if wait > 0:
             time.sleep(wait)
         s.feed(np.zeros(CHUNK, dtype=np.float32))
-    text = s.finish()
+    try:
+        text = s.finish()
+    except TimeoutError:  # 確定した文字が返らなかった（CrispASR の Qwen3-ASR は、短い発話で返さないことがある）
+        first = s.events[0][0] - t0 if s.events else None
+        return {"text": s.events[-1][1] if s.events else "", "final_lag_ms": None, "timeout": True,
+                "first_partial_s": None if first is None else round(first, 3), "partials": len(s.events),
+                "send_late_ms": 0.0, "events": [(round(t - t0, 3), x) for t, x in s.events], "t_final_s": None}
     first = s.events[0][0] - t0 if s.events else None
     return {"text": text, "final_lag_ms": round((s.t_final - t_end) * 1000, 1),
             "first_partial_s": None if first is None else round(first, 3), "partials": len(s.events),
@@ -216,10 +222,12 @@ def main() -> None:
     load_s = time.perf_counter() - t0
     rows = []
     try:
-        short = min(range(len(audios)), key=lambda i: len(audios[i]))
-        run_one(s, audios[short])  # ウォームアップ
+        mid = sorted(range(len(audios)), key=lambda i: len(audios[i]))[len(audios) // 2]
+        run_one(s, audios[mid])  # ウォームアップ（長さが中くらいの発話）
         for it, audio in zip(items, audios):
             r = run_one(s, audio)
+            if r["text"].startswith("[error]"):  # 実行系がエラーを返した（結果は保存しない）
+                raise RuntimeError(r["text"][:300])
             row = {"utt": it["id"], "ref": it["ref"], "hyp": r.pop("text"), "audio_s": round(len(audio) / 16000, 2), **r}
             row.update(score_pair(it["ref"], row["hyp"]))
             rows.append(row)
@@ -227,7 +235,7 @@ def main() -> None:
     finally:
         s.close()
 
-    lags = [r["final_lag_ms"] for r in rows]
+    lags = [r["final_lag_ms"] for r in rows if r["final_lag_ms"] is not None]
     firsts = [r["first_partial_s"] for r in rows if r["first_partial_s"] is not None]
     # 途中の文字が話し終える前に出た割合（出なければストリーミングになっていない）
     early = [r for r in rows if r["first_partial_s"] is not None and r["first_partial_s"] < r["audio_s"]]
@@ -238,7 +246,8 @@ def main() -> None:
                "mean_first_partial_s": round(statistics.mean(firsts), 3) if firsts else None,
                "partial_before_end": round(len(early) / len(rows), 3),
                "mean_audio_s": round(statistics.mean(r["audio_s"] for r in rows), 2),
-               "max_send_late_ms": max(r["send_late_ms"] for r in rows)}
+               "max_send_late_ms": max(r["send_late_ms"] for r in rows),
+               "timeouts": sum(1 for r in rows if r.get("timeout"))}
     out = REPO / "data" / "results" / args.out_dir / f"{name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({**summary, "rows": rows}, ensure_ascii=False, indent=1), encoding="utf-8")

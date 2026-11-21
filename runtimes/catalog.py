@@ -59,7 +59,8 @@ ASR: dict[str, dict[str, dict]] = {
         "qwen3-asr-1.7b": {"model": "qwen3-asr-1.7b"},
     },
     "audiocpp": {
-        "haas-ja": {"family": "haas_asr", "package": "haas_ja_v1_q8_0"},
+        # ライブ認識（ストリーミング）は language を付けると「知らないオプション」で断られる
+        "haas-ja": {"family": "haas_asr", "package": "haas_ja_v1_q8_0", "live_language": False},
         "qwen3-asr-0.6b": {"family": "qwen3_asr", "package": "qwen3_asr_0_6b_q8_0"},
         "qwen3-asr-1.7b": {"family": "qwen3_asr", "package": "qwen3_asr_1_7b_q8_0"},
         "fun-asr-nano": {"family": "fun_asr_nano", "package": "fun_asr_nano_2512_q8_0"},

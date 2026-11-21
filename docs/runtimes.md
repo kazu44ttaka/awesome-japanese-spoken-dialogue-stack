@@ -137,8 +137,10 @@ export SPEECH_MODEL_DIR=D:/awesome-japanese-speech/models/speechcpp
 - **speech.cpp**：TTS は `"response_format": "pcm"` だけでチャンクで届く（`X-Sample-Rate` ヘッダー付き。`"stream"` を
   付けると 400）。ASR は WebSocket `/v1/realtime`（OpenAI Realtime の形）で、音声は **24 kHz** の PCM を base64 で送る
 - **CrispASR**：TTS は `"stream": true`。逐次に音を出すのは Qwen3-TTS だけで、ほかは 1 文ずつ作ってから送る。
-  ASR は `--ws-port` を付けて立ち上げると開く vLLM Realtime の WebSocket（`/v1/realtime`、16 kHz）で、0.5 秒ごとに
-  それまでの音声全体を認識し直す。0.8.54 ではこの WebSocket が HTTP と **同じ番号** で `0.0.0.0` に開き、HTTP は
+  ASR は `--ws-port` を付けて立ち上げると開く vLLM Realtime の WebSocket（`/v1/realtime`、16 kHz）。途中経過
+  （`partial_transcription`）を出すのは、もともとストリーミングのモデル（Nemotron）だけで、ほかのモデルは commit を送って
+  から全体を 1 回認識する（`session.update` でも変えられなかった）。Qwen3-ASR は短い発話で、確定の文字（`completed`）を
+  返さないことがある。0.8.54 ではこの WebSocket が HTTP と **同じ番号** で `0.0.0.0` に開き、HTTP は
   `127.0.0.1` に開くので、`127.0.0.1` へつなぐと HTTP 側に届いて 404 になる。`127.0.0.2` へつなぐと WebSocket 側に届く
 
 ## 比べるための元の実装（PyTorch）

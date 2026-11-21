@@ -193,7 +193,7 @@ class _StreamASRBase:
         self.final, self.t_final = text, time.perf_counter()
         self._done.set()
 
-    def finish(self, timeout: float = 120.0) -> str:
+    def finish(self, timeout: float = 30.0) -> str:
         self._end()
         if not self._done.wait(timeout):
             raise TimeoutError("確定した文字が返りませんでした")
@@ -217,7 +217,7 @@ class AudioCppLiveASR(_StreamASRBase):
         self._done.clear()
         self.text = ""
         q = urllib.parse.urlencode({"model": self.model, "sample_rate": 16000, "channels": 1, "sample_format": "s16le",
-                                    "language": self.language})
+                                    **({"language": self.language} if self.language else {})})
         self.h = _HttpStream(self.base_url)
         self.h.send_request("POST", f"/v1/audio/transcriptions/live?{q}",
                             {"Content-Type": "application/octet-stream", "Transfer-Encoding": "chunked"})
@@ -366,7 +366,7 @@ def create_stream_asr(runtime: str, key: str, device: str = "cuda", threads: int
         server, url = start_audiocpp([{"id": key, "family": spec["family"], "path": str(path), "task": "asr",
                                        "mode": "streaming", **spec.get("load", {}), **spec.get("stream_load", {})}],
                                      device, threads)
-        s = AudioCppLiveASR(url, key, lang)
+        s = AudioCppLiveASR(url, key, lang if spec.get("live_language", True) else "")
     elif runtime == "speechcpp":
         server, url = start_speechcpp([spec["model"]], device, threads, spec.get("args"))
         session = {"type": "transcription", "audio": {"input": {"format": {"type": "audio/pcm", "rate": 24000},

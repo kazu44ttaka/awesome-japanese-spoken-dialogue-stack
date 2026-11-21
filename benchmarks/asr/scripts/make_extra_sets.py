@@ -4,7 +4,7 @@
 
 - magichub-conv-1000-seed0: MagicHub の Japanese Spontaneous Conversation（2 人の自由会話を話者ごとに録音、
   iPhone）。書き起こしの区切りで切り出し、聞き取れない・重なり・別の人の声などの印がある区間と、録音の始めの
-  決まり文句は除く。長さ 0.5〜20 秒から 1000 区間を乱数で選ぶ。著作権は Magic Data にあり再配布できないので、
+  決まり文句は除く。長さ 0.5〜20 秒から 1000 区間を乱数で選び、前後に 0.5 秒の無音を足す。著作権は Magic Data にあり再配布できないので、
   評価にだけ使う（音声も書き起こしも公開しない）
 """
 
@@ -35,11 +35,14 @@ def _resample(audio: np.ndarray, rate: int) -> np.ndarray:
     return F.resample(torch.from_numpy(np.ascontiguousarray(audio)), rate, 16000).numpy()
 
 
+PAD_SEC = 0.5  # 区間の前後に足す無音（書き起こしの時刻どおりに切ると音声がいきなり始まり、頭を落とすモデルが不利になる）
+
+
 def make_magichub(n: int = 1000, seed: int = 0) -> None:
     import soundfile as sf
     from huggingface_hub import HfApi, hf_hub_download
 
-    out = EVAL / f"magichub-conv-{n}-seed{seed}"
+    out = EVAL / f"magichub-conv-{n}-seed{seed}-pad"
     if (out / "manifest.json").is_file():
         return
     files = HfApi().list_repo_files(MAGIC, repo_type="dataset")
@@ -68,7 +71,8 @@ def make_magichub(n: int = 1000, seed: int = 0) -> None:
             a, rate = sf.read(hf_hub_download(MAGIC, wav, repo_type="dataset"), dtype="float32", always_2d=True)
             cache[wav] = (_resample(a.mean(axis=1), rate), 16000)
         a, rate = cache[wav]
-        clip = a[int(s * rate):int(e * rate)]
+        pad = np.zeros(int(PAD_SEC * rate), dtype=np.float32)
+        clip = np.concatenate([pad, a[int(s * rate):int(e * rate)], pad])
         name = f"{i:05d}.wav"
         sf.write(str(out / name), clip, rate, subtype="PCM_16")
         rows.append({"wav": name, "ref": text})

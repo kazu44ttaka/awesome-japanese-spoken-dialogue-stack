@@ -81,6 +81,8 @@ def one(name: str, man: dict) -> dict | None:
         ph = man[r["utt"]]
         ref = [p[0].lower() for p in ph]
         ends = [p[2] for p in ph]
+        if r.get("t_final_s") is None:  # 確定した文字が返らなかった発話は数えない
+            continue
         events = [(t, x) for t, x in r.get("events", [])] + [(r["t_final_s"], r["hyp"])]
         sets = [matched(ref, to_phones(x)) for _, x in events]
         total += len(ref)
