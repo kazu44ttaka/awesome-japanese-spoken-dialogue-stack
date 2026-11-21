@@ -139,8 +139,10 @@ export SPEECH_MODEL_DIR=D:/awesome-japanese-speech/models/speechcpp
 - **CrispASR**：TTS は `"stream": true`。逐次に音を出すのは Qwen3-TTS だけで、ほかは 1 文ずつ作ってから送る。
   ASR は `--ws-port` を付けて立ち上げると開く vLLM Realtime の WebSocket（`/v1/realtime`、16 kHz）。途中経過
   （`partial_transcription`）を出すのは、もともとストリーミングのモデル（Nemotron）だけで、ほかのモデルは commit を送って
-  から全体を 1 回認識する（`session.update` でも変えられなかった）。Qwen3-ASR は短い発話で、確定の文字（`completed`）を
-  返さないことがある。0.8.54 ではこの WebSocket が HTTP と **同じ番号** で `0.0.0.0` に開き、HTTP は
+  から全体を 1 回認識する（`session.update` でも変えられなかった）。Qwen3-ASR は、途中まで文字を送ったあと確定の文字（`completed`）を
+  返さず、接続を開いたまま止まることがある（timing100 の 34 発話中 16 発話。長い発話ほど多い。同じ発話で測り直しても同じ
+  ところで止まる）。サーバーの Realtime の処理（`examples/server/realtime_server.cpp`）は、受けた要求の処理で起きた例外を
+  `catch (...) {}` で何も記録せずに捨てるので、確定の文字を作る途中の例外で黙って止まっているとみられる（中身は確かめていない）。0.8.54 ではこの WebSocket が HTTP と **同じ番号** で `0.0.0.0` に開き、HTTP は
   `127.0.0.1` に開くので、`127.0.0.1` へつなぐと HTTP 側に届いて 404 になる。`127.0.0.2` へつなぐと WebSocket 側に届く
 
 ## 比べるための元の実装（PyTorch）

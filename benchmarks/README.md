@@ -23,8 +23,8 @@
 
 ## ページ
 
-- [2026-11-runtimes.md](2026-11-runtimes.md) — 同じモデルを実行系ごとに比較（元の実装・sherpa-onnx・faster-whisper・CrispASR・audio.cpp・speech.cpp）。ASR 18 モデル・TTS 22 モデルの速さ（GPU・CPU）・読みの CER・メモリ・読み込み時間
-- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 23 構成（MaAI-SDS の設定 2 つを含む）を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較。読みの CER
+- [2026-11-runtimes.md](2026-11-runtimes.md) — 同じモデルを実行系ごとに比較（元の実装・sherpa-onnx・faster-whisper・CrispASR・audio.cpp・speech.cpp）。ASR・TTS の速さ（GPU・CPU）・読みの CER・メモリ・読み込み時間、ストリーミング（話し終わってから文字が出るまで・音素ごとの遅れ・TTS の最初の声）、TTS の自然さ（UTMOS）と話者の近さ、LLM の実行系
+- [asr/2026-11-3sets.md](asr/2026-11-3sets.md) — ASR 23 構成（MaAI-SDS の設定 2 つを含む）を 3 つの公開評価データ（FLEURS・ReazonSpeech・Common Voice）で比較し、2 人の自由会話（MagicHub）でも 29 構成を測った。読みの CER
 - [asr/2026-11-timing.md](asr/2026-11-timing.md) — 同じ 100 発話での ASR の処理時間（GPU と CPU 8 スレッドを分けて）
 - [asr/2026-08-jsut20.md](asr/2026-08-jsut20.md) — ASR 18 構成の CER と処理時間
 - [asr/2026-11-jsut20.md](asr/2026-11-jsut20.md) — 新しい候補（Moonshine・Granite・Fun-ASR-MLT）と、句読点を除いた CER

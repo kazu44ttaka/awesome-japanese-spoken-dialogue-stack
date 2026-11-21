@@ -95,6 +95,8 @@ def main() -> None:
     ap.add_argument("names", nargs="*", help="結果の名前（省くとすべて）")
     ap.add_argument("--asr", default="faster-whisper,sherpa-cohere,sherpa-reazonspeech-k2", help="ASR の名前（カンマ区切りで複数）")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--offline", action="store_true",
+                    help="ASR を動かさず、前に残した書き起こし（rows の asr_all）で採点し直す（採点の決まりを変えたとき）")
     args = ap.parse_args()
 
     from asrkit.backends import create
@@ -102,15 +104,18 @@ def main() -> None:
     res_dir = REPO / "data" / "results" / "tts"
     paths = [res_dir / f"{n}.json" for n in args.names] if args.names else sorted(res_dir.glob("*.json"))
     names = [a.strip() for a in args.asr.split(",") if a.strip()]
-    recognizers = [create(n, device=args.device) for n in names]
+    recognizers = [] if args.offline else [create(n, device=args.device) for n in names]
     table = []
     for path in paths:
         data = json.loads(path.read_text(encoding="utf-8"))
         scored = []
         edits = lens = 0
         for row in data["rows"]:
-            audio = load16k(REPO / row["wav"])
-            hyps = [rec(audio) for rec in recognizers]
+            if args.offline:
+                hyps = [row["asr_all"][n] for n in names]
+            else:
+                audio = load16k(REPO / row["wav"])
+                hyps = [rec(audio) for rec in recognizers]
             row["asr_all"] = dict(zip(names, hyps))
             scored.append(score_pair(row["text"], hyps[0]))
             row["cer_kana_single"] = scored[-1]["cer_kana"]

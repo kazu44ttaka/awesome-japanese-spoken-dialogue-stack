@@ -42,8 +42,44 @@ def _hira_to_kata(text: str) -> str:
     return "".join(chr(ord(ch) + 0x60) if "ぁ" <= ch <= "ゖ" else ch for ch in text)
 
 
+_DIGITS = "〇一二三四五六七八九"
+_NUM = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+
+
+def _int_to_kanji(s: str) -> str:
+    """"2026" → "二千二十六"。頭が 0 の数字列（"007" など）は 1 桁ずつ読む。"""
+    if len(s) > 1 and s[0] == "0" or len(s) > 16:
+        return "".join(_DIGITS[int(c)] for c in s)
+    n = int(s)
+    if n == 0:
+        return "ゼロ"
+    out = ""
+    for big, unit in ((10**12, "兆"), (10**8, "億"), (10**4, "万"), (1, "")):
+        part, n = divmod(n, big)
+        if not part:
+            continue
+        small = ""
+        for v, u in ((1000, "千"), (100, "百"), (10, "十")):
+            d, part = divmod(part, v)
+            if d:
+                small += ("" if d == 1 else _DIGITS[d]) + u
+        if part:
+            small += _DIGITS[part]
+        out += small + unit
+    return out
+
+
+def _num_to_kanji(m: re.Match) -> str:
+    whole, _, frac = m.group(0).replace(",", "").partition(".")
+    return _int_to_kanji(whole) + ("点" + "".join(_DIGITS[int(c)] for c in frac) if frac else "")
+
+
 def norm_kana(text: str) -> str:
-    """句読点を除いてカタカナの読みにする。辞書に読みが無い語（英字・数字など）は表記のまま。"""
+    """句読点を除いてカタカナの読みにする。辞書に読みが無い語（英字など）は表記のまま。
+
+    算用数字は、句読点を除く前に漢数字に直してから読む（「72 時間」と「七十二時間」を同じ読みにする）。
+    """
+    text = _NUM.sub(_num_to_kanji, unicodedata.normalize("NFKC", text or "")).replace("%", "パーセント")
     plain = norm_nopunct(text)
     if not plain:
         return ""
