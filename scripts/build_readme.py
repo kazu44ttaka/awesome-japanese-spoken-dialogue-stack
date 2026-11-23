@@ -131,12 +131,18 @@ def _score_cells(rows: list[dict], kind: str | None) -> list[list[str]]:
     return [list(c) for c in zip(*cols)]
 
 
-def render_table(rows: list[dict], lang: str, prefix: str) -> str:
+def render_table(rows: list[dict], lang: str, prefix: str, full: bool = False) -> str:
+    """full=False は README 用の短い表（モデル・ストリーミング・測った値・動かし方・商用・メモ）、
+    full=True は詳細のページ用の全部の列の表（開発元・日本語・大きさ・ライセンス・値を測った構成も）。"""
     lab = LABELS[lang]
     kind = "asr" if any("cer" in r for r in rows) else "tts" if any("tts_ms" in r for r in rows) else None
     extra = lab["score_cols"][kind] if kind else []
-    header = lab["header"][:4] + extra + lab["header"][4:]
-    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * 4 + "---:|" * len(extra) + "---|" * (len(header) - 4 - len(extra))]
+    h = lab["header"]  # モデル 開発元 日本語 ストリーミング 動かし方 大きさ ライセンス 商用 メモ
+    if full:
+        header, lead = h[:4] + extra + h[4:], 4
+    else:
+        header, lead = [h[0], h[3], *extra, h[4], h[7], h[8]], 2
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * lead + "---:|" * len(extra) + "---|" * (len(header) - lead - len(extra))]
     scores = _score_cells(rows, kind)
     for row, score in zip(rows, scores):
         def conv(field: str) -> str:
@@ -149,22 +155,17 @@ def render_table(rows: list[dict], lang: str, prefix: str) -> str:
         name = f"[{_cell(row['name'])}]({row['url']})"
         note = _cell(row.get(lab["note"], ""))
         measured = row.get("measured_en" if lang == "en" else "measured")
-        if measured:
+        if measured and full:
             note += (f"（{lab['measured'].format(measured)}）" if lang == "ja" else f" ({lab['measured'].format(measured)})")
-        if row.get("bench"):
+        if row.get("bench") and full:
             note += f" （[{lab['bench']}]({prefix}{row['bench']})）" if lang == "ja" else f" ([{lab['bench']}]({prefix}{row['bench']}))"
-        cells = [
-            name,
-            _cell(conv("org")),
-            lab["ja"].get(row.get("ja", ""), row.get("ja", "")),
-            lab["streaming"].get(row.get("streaming", ""), row.get("streaming", "")),
-            *score,
-            _cell(conv("runtime")),
-            _cell(conv("size")),
-            _cell(conv("license")),
-            lab["commercial"].get(row.get("commercial", ""), row.get("commercial", "")),
-            note,
-        ]
+        streaming = lab["streaming"].get(row.get("streaming", ""), row.get("streaming", ""))
+        commercial = lab["commercial"].get(row.get("commercial", ""), row.get("commercial", ""))
+        if full:
+            cells = [name, _cell(conv("org")), lab["ja"].get(row.get("ja", ""), row.get("ja", "")), streaming, *score,
+                     _cell(conv("runtime")), _cell(conv("size")), _cell(conv("license")), commercial, note]
+        else:
+            cells = [name, streaming, *score, _cell(conv("runtime")), commercial, note]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
@@ -175,6 +176,44 @@ def render_todo(rows: list[dict], lang: str) -> str:
     for row in rows:
         lines.append(f"| [{_cell(row['name'])}]({row['url']}) | {_cell(row.get(lab['note'], ''))} |")
     return "\n".join(lines)
+
+
+DETAIL = {
+    "ja": {"path": "docs/models.md", "title": "モデルの詳細",
+           "intro": ["README の表に、開発元・日本語への対応・大きさ・ライセンス・値を測った構成を足した全部の列の表です。"
+                     "data/models.toml から scripts/build_readme.py で作るので、直接は編集しません。",
+                     "商用の「条件つき」は年商などの条件を満たせば使えるもの、「不明」はライセンスの記載が無いもの。"
+                     "ライセンスは 2026-11-21 に公式ページで確かめました。使う前に公式ページを見てください。",
+                     "[README に戻る](../README.md)"],
+           "sections": [("asr", "ASR（音声認識）"), ("asr_todo", "未評価の候補"), ("tts", "TTS（音声合成）"), ("llm", "LLM"),
+                        ("dialog", "音声対話の周辺")]},
+    "en": {"path": "docs/models.en.md", "title": "Model details",
+           "intro": ["The README tables with every column: developer, Japanese support, size, license and the configuration "
+                     "the scores come from. Generated from data/models.toml by scripts/build_readme.py; do not edit.",
+                     "Commercial \"conditional\" means allowed under conditions such as a revenue cap; \"unknown\" means no license "
+                     "is stated. Licenses were checked on 2026-11-21; check the official page before use.",
+                     "[Back to the README](../README.en.md)"],
+           "sections": [("asr", "ASR"), ("asr_todo", "Not yet evaluated"), ("tts", "TTS"), ("llm", "LLM"),
+                        ("dialog", "Spoken dialogue (VAD, turn-taking, backchannels)")]},
+}
+
+
+def build_detail(lang: str, data: dict) -> str:
+    d = DETAIL[lang]
+    out = [f"# {d['title']}", ""]
+    for x in d["intro"]:
+        out += [x, ""]
+    for key, heading in d["sections"]:
+        rows = data.get(key, [])
+        if not rows:
+            continue
+        out += [f"## {heading}", ""]
+        out.append(render_todo(rows, lang) if key.endswith("_todo") else render_table(rows, lang, "../", full=True))
+        out.append("")
+    header = ("<!-- このファイルは scripts/build_readme.py が data/models.toml から作る。直接編集しない。 -->" if lang == "ja"
+              else "<!-- Generated by scripts/build_readme.py from data/models.toml. Do not edit. -->")
+    return header + "\n" + "\n".join(out).rstrip("\n") + "\n"
+
 
 
 def build(lang: str, data: dict) -> str:
@@ -201,10 +240,10 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="README が最新でなければ 1 で終わる")
     args = parser.parse_args()
     data = tomllib.loads((ROOT / "data" / "models.toml").read_text(encoding="utf-8"))
-    targets = {"ja": ROOT / "README.md", "en": ROOT / "README.en.md"}
+    targets = [(ROOT / "README.md", build("ja", data)), (ROOT / "README.en.md", build("en", data)),
+               (ROOT / DETAIL["ja"]["path"], build_detail("ja", data)), (ROOT / DETAIL["en"]["path"], build_detail("en", data))]
     stale = []
-    for lang, path in targets.items():
-        text = build(lang, data)
+    for path, text in targets:
         current = path.read_text(encoding="utf-8") if path.exists() else ""
         if current != text:
             if args.check:

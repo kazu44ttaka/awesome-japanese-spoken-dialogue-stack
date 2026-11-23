@@ -25,6 +25,8 @@
 
 ## 測り方
 
+<details><summary>開く</summary>
+
 **ASR**（[asr/scripts/eval_asr.py](asr/scripts/eval_asr.py)）
 - 速さ：`timing100`（ReazonSpeech 40・Common Voice 30・FLEURS 30 発話、平均 8.5 秒。[ASR の速さのページ](asr/2026-11-timing.md) と同じ）を 1 発話ずつ
   認識し、認識し終えるまでの平均。GPU と CPU（8 スレッド）。speech.cpp は新しい長さの音声で GPU のシェーダーを作り直すので、
@@ -46,7 +48,11 @@
   英語の読み上げで学習した推定器なので、日本語では値そのものより比べ合いに使う
 - 話者の近さ：参照音声との話者ベクトル（microsoft/wavlm-base-plus-sv）のコサイン類似度。参照音声でクローンするモデルだけ
 
+</details>
+
 ## わかったこと
+
+<details><summary>開く</summary>
 
 - **速さは、モデルごとに一番速い実行系が違う。** ASR は Qwen3-ASR なら speech.cpp、Fun-ASR なら CrispASR、Cohere・Nemotron なら
   audio.cpp。TTS は多くのモデルで audio.cpp が速く（Irodori・Qwen3-TTS・OmniVoice・VoxCPM2）、MOSS-TTS-Local だけは CrispASR が 7 倍速い
@@ -130,6 +136,8 @@
   声のファイルが別に要る。audio.cpp の Kokoro も、配布の GGUF に日本語の辞書が入っておらず読めない）、speech.cpp の Qwen3-TTS のクローン
   （speech.cpp の 0.6B は CustomVoice 版で、録音から声を作れない。Base 版は配布されていない）、VibeVoice-ASR（長い録音向けで、短い発話では英語の文などを出す。audio.cpp では時間切れ）、
   audio.cpp の Granite Speech 5.0 TurboCTC（日本語に対応する前の英語だけの重み）
+
+</details>
 
 ## ASR
 

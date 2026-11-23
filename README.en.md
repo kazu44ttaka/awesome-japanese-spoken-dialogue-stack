@@ -3,81 +3,59 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-ASR, TTS, LLMs and the surrounding models for building Japanese spoken dialogue systems, with speed and accuracy measured per runtime on the same machine, and demo apps to try the models locally.
+ASR, TTS, LLMs and related models for Japanese spoken dialogue systems. [日本語](README.md)
 
-[日本語](README.md)
+- Speed, accuracy and memory of the same model across runtimes, all measured on one PC ([runtime comparison](benchmarks/2026-11-runtimes.md))
+- Latency that matters in dialogue: end of speech to text, time to first audio
+- Apps to try every measured configuration with your microphone or speakers ([apps/](apps/README.md))
 
-- **List**: Japanese support, streaming, license and runtimes for each model.
-- **Runtime comparison**: the same model run with its original implementation, [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), [CrispASR](https://github.com/CrispStrobe/CrispASR), [audio.cpp](https://github.com/0xShug0/audio.cpp) and [speech.cpp](https://github.com/nyosegawa/speech.cpp), measured for speed, accuracy and memory. The same model can be several times faster depending on the runtime.
-- **Latency too**: time from the end of speech to the text, and time to the first audio, which matter in spoken dialogue.
-- **Try them locally**: every measured configuration can be tried in an ASR app that recognises your microphone and a TTS app that reads text aloud, including the choice of runtime, with the latency shown as you go ([apps/](apps/README.md)).
+**Updates**: 2026-11-22 CPU measurements and missing configurations / 2026-11-21 conversational ASR, streaming latency, UTMOS, LLM runtimes ([changelog](CHANGELOG.md))
 
-## Latest updates
-
-- **2026-11-22** Measured on CPU the models only measured on GPU and filled the remaining gaps (conversation and more). Added configurations the runtimes support but we had not set up (LFM2.5-Audio, Kitten and ZONOS3 on audio.cpp, Qwen3-TTS VoiceDesign, Moonshine on CrispASR and more).
-- **2026-11-21** Added ASR on free two-person conversation, streaming latency, TTS naturalness (UTMOS) and LLM runtimes. Fixed how numerals are scored and rescored every result. Checked every model license.
-- **2026-11-18** Added a [page](benchmarks/2026-11-runtimes.md) comparing the same model across runtimes.
-
-[Full changelog](CHANGELOG.md)
-
-## Contents
-
-- [Quick picks](#quick-picks)
-- [ASR](#asr)
-- [TTS](#tts)
-- [LLM](#llm)
-- [Spoken dialogue (VAD, turn-taking, backchannels)](#spoken-dialogue-vad-turn-taking-backchannels)
-- [Runtimes](#runtimes)
-- [Try it](#try-it)
-- [Benchmarks](#benchmarks)
-- [Contributing](#contributing)
-- [License](#license)
+[Picks](#quick-picks) · [ASR](#asr) · [TTS](#tts) · [LLM](#llm) · [Dialogue](#spoken-dialogue) · [Runtimes](#runtimes) · [Try it](#try-it) · [Benchmarks](#benchmarks)
 
 ## Quick picks
 
-First choices based on our measurements. Check the license column below before commercial use.
-
-| Goal | Pick | Why |
+| Goal | Pick | Numbers |
 |---|---|---|
-| Fast, accurate ASR on GPU | Haas-ja v1.0, Parakeet TDT-CTC 0.6B ja | ~40 ms per utterance; on held-out FLEURS, Haas 0.025 and Parakeet 0.038 ([ASR accuracy](benchmarks/asr/2026-11-3sets.md)) |
-| ASR on CPU only | ReazonSpeech k2-v2 | ~90 ms per utterance, CER 0.036 on FLEURS ([latency](benchmarks/asr/2026-11-timing.md)) |
-| Casual conversation | Qwen3-ASR 1.7B (speech.cpp) | Best CER on free two-person conversation (0.091) ([conversation](benchmarks/asr/2026-11-3sets.md#会話magichub-の自由会話)) |
-| Text while the user is still speaking | Pseudo-streaming Parakeet TDT-CTC or Haas-ja | Text appears ~60-130 ms after each phoneme; true-streaming Nemotron takes 0.5-0.8 s ([streaming](benchmarks/2026-11-runtimes.md#ストリーミング)) |
-| Fast TTS | VOICEVOX (voicevox_core), Supertonic 3 (audio.cpp) | ~50 ms and ~90 ms per sentence on GPU ([TTS](benchmarks/tts/2026-11-tts.md)) |
-| Voice cloning | Qwen3-TTS (audio.cpp, speech.cpp) | ~0.6 s per sentence, 32-92 ms to first audio when streaming ([runtimes](benchmarks/2026-11-runtimes.md)) |
-| Voice from a text description | Qwen3-TTS 1.7B VoiceDesign (audio.cpp), Irodori-TTS (audio.cpp) | Qwen3-TTS ~0.7 s per sentence with 25 ms to first audio; Irodori ~0.4 s per sentence ([runtimes](benchmarks/2026-11-runtimes.md)) |
-| Fast first reply from the LLM | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms and 45 ms to the first token ([LLM](benchmarks/llm/2026-11-lmstudio.md)) |
+| Fast, accurate ASR on GPU | Haas-ja v1.0, Parakeet TDT-CTC 0.6B ja | ~40 ms per utterance, FLEURS CER 0.025 / 0.038 |
+| ASR on CPU only | ReazonSpeech k2-v2 | ~90 ms per utterance, CER 0.036 |
+| Casual conversation | Qwen3-ASR 1.7B | Conversation CER 0.089-0.091 |
+| Text while the user speaks | Pseudo-streaming Parakeet TDT-CTC or Haas-ja | ~60-130 ms from phoneme to text |
+| Fast TTS | VOICEVOX (voicevox_core), Supertonic 3 (audio.cpp) | ~50 ms / ~90 ms per sentence |
+| Voice cloning | Qwen3-TTS (audio.cpp, speech.cpp) | ~0.6 s per sentence, 32-92 ms to first audio |
+| Voice from a description | Qwen3-TTS 1.7B VoiceDesign (audio.cpp) | ~0.7 s per sentence, 25 ms to first audio |
+| Fast first LLM reply | LFM2.5 1.2B JP, ELYZA-Shortcut 7B | 39 ms / 45 ms to first token |
 
-**Reading the tables**: CER is the reading-based character error rate (both sides converted to katakana readings; lower is better). Times are on GPU unless noted, per utterance for ASR and per sentence for TTS. The numbers come from the configuration shown as "values:" in the notes; "—" means not measured. The benchmark pages are in Japanese.
+Times are on GPU. CER is computed on katakana readings; lower is better. "—" means not measured. Developer, license and the measured configuration are in [model details](docs/models.en.md). Benchmark pages are in Japanese.
 
 ## ASR
 
-The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER on each test set (read speech, TV broadcasts, crowd-sourced read speech and free two-person conversation; [details](benchmarks/asr/2026-11-3sets.md)). **†** means the model card lists that test set (or data from the same source) in training, so the score is favourable. Bold marks the best value without †. Conversation segments are padded with 0.5 s of silence on both ends, which helps some models and hurts others. "Streaming" yes means text can appear while the user is speaking; pseudo means short segments are re-recognised repeatedly.
+CER on four test sets: read speech, TV, crowd-sourced read speech and free two-person conversation ([details](benchmarks/asr/2026-11-3sets.md)). **†** = trained on that test set's source (favourable); bold = best without †. Pseudo streaming re-recognises short segments.
 
-| Model | Developer | Japanese | Streaming | FLEURS | ReazonSpeech | CV | Conversation | Runtime | Size | License | Commercial | Notes |
-|---|---|---|---|---:|---:|---:|---:|---|---|---|---|---|
-| [Fun-ASR-Nano-2512](https://github.com/QwenAudio/Fun-ASR) | Alibaba (FunAudioLLM) | multilingual | — | 0.033 | 0.125 | 0.034 | 0.176 | PyTorch, sherpa-onnx, CrispASR, audio.cpp | ~0.8B (audio encoder + Qwen3-0.6B decoder) | Apache-2.0 | yes | ~130 ms per utterance with CrispASR on GPU, 5x faster than PyTorch. The conversation score includes 3 runaway repetitions on backchannels (0.093 without them). The sherpa-onnx build degrades on conversational speech (values: funasr) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [SenseVoiceSmall](https://github.com/QwenAudio/SenseVoice) | Alibaba (FunAudioLLM) | multilingual | pseudo | 0.049 | 0.183 | 0.044 | 0.126 | FunASR, ONNX, sherpa-onnx, CrispASR, audio.cpp | ~234M | Code MIT, model FunASR Model License v1.1 (attribution required) | yes | Fast (~90 ms on CPU, ~40 ms on GPU) but degrades on broadcast speech. Use the 2024-07-17 sherpa-onnx build (values: sherpa-onnx) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Parakeet TDT-CTC 0.6B ja](https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja) | NVIDIA | dedicated | — | 0.038 | 0.092† | 0.023 | 0.122 | NeMo, sherpa-onnx, speech.cpp, CrispASR | 0.6B | CC-BY-4.0 | yes | ~40-55 ms on GPU, ~180 ms on CPU. Fastest text with pseudo-streaming (~70 ms after each phoneme) (values: NeMo) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Cohere Transcribe (03-2026)](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026) | Cohere | multilingual | — | 0.023 | 0.048 | **0.017** | 0.140 | PyTorch, sherpa-onnx, audio.cpp, CrispASR | Q4_K ~1.5 GB - Q8_0 ~2.4 GB | Apache-2.0 (gated: accept the terms to download) | yes | Near the top on every test set. ~0.8 s on CPU, ~100 ms on GPU (audio.cpp). 14 languages (values: sherpa-onnx) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Cohere ASR ja v0.1](https://huggingface.co/efwkjn/cohere-asr-ja-v0.1) | efwkjn (Japanese fine-tune of Cohere Transcribe) | dedicated | — | 0.025 | 0.092 | 0.018 | 0.127 | CrispASR (GGUF) | 2B (Q8_0 ~2.4 GB) | Not stated (the base Cohere Transcribe is Apache-2.0) | unknown | Japanese fine-tune of Cohere Transcribe; worse than the base on broadcast speech. ~190 ms on GPU (values: CrispASR) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Qwen3-ASR (1.7B / 0.6B)](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Alibaba (Qwen) | multilingual | — | 0.029 | 0.182 | 0.036 | **0.091** | PyTorch, sherpa-onnx, speech.cpp, audio.cpp, CrispASR | 1.7B / 0.6B | Apache-2.0 | yes | Best on conversation but degrades on broadcast speech. 1.7B runs at ~165 ms with speech.cpp on GPU (5x+ faster than PyTorch). 0.6B scores 0.105 on conversation. Set the language with sherpa-onnx (values: speech.cpp, 1.7B) ([results](benchmarks/2026-11-runtimes.md)) |
-| [ReazonSpeech NeMo v2](https://huggingface.co/reazon-research/reazonspeech-nemo-v2) | Reazon Holdings | dedicated | — | 0.038 | 0.039† | 0.033 | 0.160 | NVIDIA NeMo, speech.cpp, CrispASR | 619M | Apache-2.0 | yes | Strong on broadcast speech. ~100 ms with speech.cpp (~350 ms with NeMo) (values: NeMo) ([results](benchmarks/2026-11-runtimes.md)) |
-| [ReazonSpeech k2-v2](https://huggingface.co/reazon-research/reazonspeech-k2-v2) | Reazon Holdings | dedicated | — | 0.036 | 0.025† | 0.024 | 0.147 | sherpa-onnx | 159M | Apache-2.0 | yes | Fast on CPU (~90 ms). Best on ReazonSpeech, which it was trained on. Drops the first word when audio starts abruptly; pad leading silence (values: sherpa-onnx) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Nemotron Speech ASR 0.6B (streaming)](https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b) | NVIDIA | multilingual | yes | 0.067 | 0.203 | 0.099 | 0.183 | NeMo, sherpa-onnx, audio.cpp, CrispASR | 0.6B | OpenMDW-1.1 | yes | True streaming (80/560 ms chunks). Lower accuracy and may drop short utterances. Text appears 0.5-0.8 s after each phoneme (values: NeMo (GPU)) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Kotoba-Whisper v2.2](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) | Kotoba Technologies | dedicated | — | 0.040 | 0.111† | 0.033 | 0.151 | Transformers, faster-whisper, whisper.cpp | ~756M | Apache-2.0 | yes | Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU, ~3.5 s on CPU (values: faster-whisper, int8, beam 5 (others use beam 1), 0.5 s leading silence) ([results](benchmarks/asr/2026-08-jsut20.md)) |
-| [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | OpenAI | multilingual | — | 0.024 | 0.073 | 0.028 | 0.145 | faster-whisper, whisper.cpp, CrispASR, Transformers | 809M | MIT | yes | Baseline, measured with temperature fallback. ~180 ms with faster-whisper on GPU (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | Microsoft | multilingual | — | — | — | — | — | PyTorch | ~8B | MIT | yes | Long-form (60 min) transcription with speakers and timestamps. Not measured |
-| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | Moonshine AI (Useful Sensors) | dedicated | — | 0.080 | 0.072 | 0.047 | 0.175 | Transformers, ONNX, CrispASR | 27M | Moonshine AI Community License (commercial use allowed under USD 1M annual revenue) | conditional | Only 27M. ~150 ms on CPU. CrispASR (GGUF) is faster on GPU (~70 ms) but worse on broadcast speech (0.110) (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | IBM | multilingual | — | 0.031 | 0.072† | 0.014† | 0.168 | Transformers (>=5.16), transcribe.cpp (GGUF) | 470M (encoder-only CTC) | Apache-2.0 | yes | Fastest on GPU (16 ms per utterance). ~320 ms on CPU in float32 (~6 s in bfloat16). Rarely outputs commas (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Alibaba (FunAudioLLM) | multilingual | — | **0.013** | 0.058 | 0.022 | 0.098 | funasr (PyTorch), CrispASR | ~0.8B | Apache-2.0 | yes | Top tier everywhere (FLEURS may overlap its training data). ~160 ms with CrispASR (0.4-1 s with funasr) (values: funasr) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Haas-ja v1.0](https://huggingface.co/third-intelligence/Haas-ja-v1.0) | Third Intelligence | dedicated | — | 0.025 | 0.038† | 0.007† | 0.128 | haas-asr (PyTorch), speech.cpp, audio.cpp, CrispASR | ~1.2 GB weights | Apache-2.0 | yes | Best average rank at ~40 ms on GPU. Trained on ReazonSpeech and Common Voice, so those two scores are favourable (values: haas-asr) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-4.0-1b-speech) | IBM | multilingual | — | 0.036 | 0.095† | 0.017† | 0.201 | Transformers, CrispASR | 1B (~4.4 GB weights) | Apache-2.0 | yes | LLM-style, ~1.2 s even on GPU (~460 ms with CrispASR Q4_K). Trained with Common Voice (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Granite Speech 4.1 2B](https://huggingface.co/ibm-granite/granite-speech-4.1-2b) | IBM | multilingual | — | 0.060 | 0.085† | 0.059† | 0.190 | Transformers, CrispASR | 2B | Apache-2.0 | yes | ~480 ms per utterance. Sometimes loops on a phrase. The Plus variant is similar (conversation 0.158); the NAR variant does not handle Japanese (values: CrispASR, Q4_K (others use Q8_0 or full precision)) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Moonshine base-ja](https://huggingface.co/UsefulSensors/moonshine-base-ja) | Moonshine AI (Useful Sensors) | dedicated | — | 0.070 | **0.044** | 0.035 | 0.220 | Transformers, ONNX, CrispASR | ~240 MB weights | Moonshine AI Community License (commercial use allowed under USD 1M annual revenue) | conditional | Strong on broadcast speech. ~330 ms on CPU. CrispASR (GGUF) is faster on GPU (~130 ms) but worse on broadcast speech (0.086). May repeat at the end of utterances over 20 s (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Parakeet CTC 1.1B ja](https://huggingface.co/grider-transwithai/parakeet-ctc-1.1b-ja) | grider-transwithai (Japanese fine-tune of NVIDIA Parakeet) | dedicated | — | 0.053 | 0.084 | 0.039 | 0.167 | NVIDIA NeMo | 1.1B | Apache-2.0 (base Parakeet is CC-BY-4.0) | yes | ~65 ms on GPU, ~590 ms on CPU. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune, and the CrispASR GGUF was converted from it) (values: NeMo) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [Voxtral Mini 4B Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | Mistral AI | multilingual | yes | 0.066 | 0.187 | 0.074 | 0.232 | Transformers, vLLM, audio.cpp, CrispASR | 4B (~8.3 GB weights) | Apache-2.0 | yes | Empty outputs on some utterances; no language hint. ~1.3 s with audio.cpp or CrispASR (values: Transformers (conversation: CrispASR)) ([results](benchmarks/asr/2026-11-3sets.md)) |
-| [anime-whisper](https://huggingface.co/litagin/anime-whisper) | litagin | dedicated | — | 0.043 | 0.191† | 0.036 | 0.145 | Transformers, faster-whisper, CrispASR (whisper.cpp) | ~756M (based on Kotoba-Whisper v2.0) | MIT | yes | Kotoba-Whisper fine-tuned on anime and game dialogue. Similar to the base on conversation, worse on broadcast speech. The CrispASR conversion is much worse (values: Transformers) ([results](benchmarks/asr/2026-11-3sets.md)) |
+| Model | Streaming | FLEURS | ReazonSpeech | CV | Conversation | Runtime | Commercial | Notes |
+|---|---|---:|---:|---:|---:|---|---|---|
+| [Fun-ASR-Nano-2512](https://github.com/QwenAudio/Fun-ASR) | — | 0.033 | 0.125 | 0.034 | 0.176 | PyTorch, sherpa-onnx, CrispASR, audio.cpp | yes | ~130 ms per utterance with CrispASR on GPU, 5x faster than PyTorch. The conversation score includes 3 runaway repetitions on backchannels (0.093 without them). The sherpa-onnx build degrades on conversational speech |
+| [SenseVoiceSmall](https://github.com/QwenAudio/SenseVoice) | pseudo | 0.049 | 0.183 | 0.044 | 0.126 | FunASR, ONNX, sherpa-onnx, CrispASR, audio.cpp | yes | Fast (~90 ms on CPU, ~40 ms on GPU) but degrades on broadcast speech. Use the 2024-07-17 sherpa-onnx build |
+| [Parakeet TDT-CTC 0.6B ja](https://huggingface.co/nvidia/parakeet-tdt_ctc-0.6b-ja) | — | 0.038 | 0.092† | 0.023 | 0.122 | NeMo, sherpa-onnx, speech.cpp, CrispASR | yes | ~40-55 ms on GPU, ~180 ms on CPU. Fastest text with pseudo-streaming (~70 ms after each phoneme) |
+| [Cohere Transcribe (03-2026)](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026) | — | 0.023 | 0.048 | **0.017** | 0.140 | PyTorch, sherpa-onnx, audio.cpp, CrispASR | yes | Near the top on every test set. ~0.8 s on CPU, ~100 ms on GPU (audio.cpp). 14 languages |
+| [Cohere ASR ja v0.1](https://huggingface.co/efwkjn/cohere-asr-ja-v0.1) | — | 0.025 | 0.092 | 0.018 | 0.127 | CrispASR (GGUF) | unknown | Japanese fine-tune of Cohere Transcribe; worse than the base on broadcast speech. ~190 ms on GPU |
+| [Qwen3-ASR (1.7B / 0.6B)](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | — | 0.029 | 0.182 | 0.036 | **0.091** | PyTorch, sherpa-onnx, speech.cpp, audio.cpp, CrispASR | yes | Best on conversation but degrades on broadcast speech. 1.7B runs at ~165 ms with speech.cpp on GPU (5x+ faster than PyTorch). 0.6B scores 0.105 on conversation. Set the language with sherpa-onnx |
+| [ReazonSpeech NeMo v2](https://huggingface.co/reazon-research/reazonspeech-nemo-v2) | — | 0.038 | 0.039† | 0.033 | 0.160 | NVIDIA NeMo, speech.cpp, CrispASR | yes | Strong on broadcast speech. ~100 ms with speech.cpp (~350 ms with NeMo) |
+| [ReazonSpeech k2-v2](https://huggingface.co/reazon-research/reazonspeech-k2-v2) | — | 0.036 | 0.025† | 0.024 | 0.147 | sherpa-onnx | yes | Fast on CPU (~90 ms). Best on ReazonSpeech, which it was trained on. Drops the first word when audio starts abruptly; pad leading silence |
+| [Nemotron Speech ASR 0.6B (streaming)](https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b) | yes | 0.067 | 0.203 | 0.099 | 0.183 | NeMo, sherpa-onnx, audio.cpp, CrispASR | yes | True streaming (80/560 ms chunks). Lower accuracy and may drop short utterances. Text appears 0.5-0.8 s after each phoneme |
+| [Kotoba-Whisper v2.2](https://huggingface.co/kotoba-tech/kotoba-whisper-v2.2) | — | 0.040 | 0.111† | 0.033 | 0.151 | Transformers, faster-whisper, whisper.cpp | yes | Japanese distilled Whisper, run with the MaAI-SDS settings (0.5 s leading silence). ~175 ms on GPU, ~3.5 s on CPU |
+| [Whisper large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | — | 0.024 | 0.073 | 0.028 | 0.145 | faster-whisper, whisper.cpp, CrispASR, Transformers | yes | Baseline, measured with temperature fallback. ~180 ms with faster-whisper on GPU |
+| [VibeVoice-ASR](https://huggingface.co/microsoft/VibeVoice-ASR) | — | — | — | — | — | PyTorch | yes | Long-form (60 min) transcription with speakers and timestamps. Not measured |
+| [Moonshine tiny-ja](https://huggingface.co/UsefulSensors/moonshine-tiny-ja) | — | 0.080 | 0.072 | 0.047 | 0.175 | Transformers, ONNX, CrispASR | conditional | Only 27M. ~150 ms on CPU. CrispASR (GGUF) is faster on GPU (~70 ms) but worse on broadcast speech (0.110) |
+| [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | — | 0.031 | 0.072† | 0.014† | 0.168 | Transformers (>=5.16), transcribe.cpp (GGUF) | yes | Fastest on GPU (16 ms per utterance). ~320 ms on CPU in float32 (~6 s in bfloat16). Rarely outputs commas |
+| [Fun-ASR-MLT-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | — | **0.013** | 0.058 | 0.022 | 0.098 | funasr (PyTorch), CrispASR | yes | Top tier everywhere (FLEURS may overlap its training data). ~160 ms with CrispASR (0.4-1 s with funasr) |
+| [Haas-ja v1.0](https://huggingface.co/third-intelligence/Haas-ja-v1.0) | — | 0.025 | 0.038† | 0.007† | 0.128 | haas-asr (PyTorch), speech.cpp, audio.cpp, CrispASR | yes | Best average rank at ~40 ms on GPU. Trained on ReazonSpeech and Common Voice, so those two scores are favourable |
+| [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-4.0-1b-speech) | — | 0.036 | 0.095† | 0.017† | 0.201 | Transformers, CrispASR | yes | LLM-style, ~1.2 s even on GPU (~460 ms with CrispASR Q4_K). Trained with Common Voice |
+| [Granite Speech 4.1 2B](https://huggingface.co/ibm-granite/granite-speech-4.1-2b) | — | 0.060 | 0.085† | 0.059† | 0.190 | Transformers, CrispASR | yes | ~480 ms per utterance. Sometimes loops on a phrase. The Plus variant is similar (conversation 0.158); the NAR variant does not handle Japanese |
+| [Moonshine base-ja](https://huggingface.co/UsefulSensors/moonshine-base-ja) | — | 0.070 | **0.044** | 0.035 | 0.220 | Transformers, ONNX, CrispASR | conditional | Strong on broadcast speech. ~330 ms on CPU. CrispASR (GGUF) is faster on GPU (~130 ms) but worse on broadcast speech (0.086). May repeat at the end of utterances over 20 s |
+| [Parakeet CTC 1.1B ja](https://huggingface.co/grider-transwithai/parakeet-ctc-1.1b-ja) | — | 0.053 | 0.084 | 0.039 | 0.167 | NVIDIA NeMo | yes | ~65 ms on GPU, ~590 ms on CPU. Use the general parakeet-ja.nemo (the -gal file is a visual-novel fine-tune, and the CrispASR GGUF was converted from it) |
+| [Voxtral Mini 4B Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | yes | 0.066 | 0.187 | 0.074 | 0.232 | Transformers, vLLM, audio.cpp, CrispASR | yes | Empty outputs on some utterances; no language hint. ~1.3 s with audio.cpp or CrispASR |
+| [anime-whisper](https://huggingface.co/litagin/anime-whisper) | — | 0.043 | 0.191† | 0.036 | 0.145 | Transformers, faster-whisper, CrispASR (whisper.cpp) | yes | Kotoba-Whisper fine-tuned on anime and game dialogue. Similar to the base on conversation, worse on broadcast speech. The CrispASR conversion is much worse |
 
 ### Not yet evaluated
 
@@ -87,96 +65,83 @@ The FLEURS, ReazonSpeech, CV and Conversation columns are the reading-based CER 
 
 ## TTS
 
-ms/sentence is the mean synthesis time over 20 sentences; Reading CER is the median over three ASR transcriptions of the audio; UTMOS estimates naturalness (1-5; trained on English, so treat it as a guide; it reflects the chosen voice more than the model, and cloning models all use the same reference, whose own recording scores 3.52); First audio ms is the median time to the first audio when streaming ([details](benchmarks/2026-11-runtimes.md#tts)). Bold marks the best value in each column. "Streaming" yes means audio can start before the whole sentence is synthesised.
+ms/sentence is the mean over 20 sentences; Reading CER is the ASR error on the synthesised audio; UTMOS estimates naturalness (1-5, a rough guide); First audio ms is the time to the first audio when streaming ([details](benchmarks/tts/2026-11-tts.md)).
 
-| Model | Developer | Japanese | Streaming | ms/sentence | Reading CER | UTMOS | First audio ms | Runtime | Size | License | Commercial | Notes |
-|---|---|---|---|---:|---:|---:|---:|---|---|---|---|---|
-| [AivisSpeech](https://github.com/Aivis-Project/AivisSpeech-Engine) | Aivis Project | dedicated | — | 408 | 0.004 | 3.85 | — | standalone engine + HTTP API (no Python) | per AIVMX model | engine LGPL-3.0 / voices per model | per voice/model | Easy to install with accurate readings; time varies little with sentence length. ~1.8 s per sentence on CPU (values: engine) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [VOICEVOX](https://github.com/VOICEVOX/voicevox_engine) | VOICEVOX | dedicated | — | **53** | **0.000** | 2.74 | — | standalone engine + HTTP API, voicevox_core (C API / Python) | — | engine LGPL-3.0 / per-character terms for voices | per voice/model | The Japanese standard: fastest with no reading errors, ~500 ms even on CPU (8 threads). UTMOS depends on the voice. Terms differ per voice (values: voicevox_core) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [Irodori-TTS v4.1 Small](https://github.com/Aratako/Irodori-TTS) | Aratako | dedicated | — | 1334 | **0.000** | 3.45 | — | PyTorch, audio.cpp, speech.cpp | ~2.9 GB (runtime VRAM 3.6 GB) | MIT (code and model) | yes | Voice design from a caption, plus cloning. ~0.8 s with the official fast setting (6 steps, sway). With audio.cpp, v4 Small takes ~0.4 s and v4.1 Small MF ~0.2 s (values: PyTorch, 40 steps) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [Tsukasa Speech](https://github.com/Respaired/Tsukasa-Speech) | Respair | dedicated | — | — | — | — | — | PyTorch | weights ~4.7 GB | CC-BY-NC-4.0 | no | Very fast (RTF 0.015), anime style. Non-commercial; hard to install ([results](benchmarks/tts/2026-08-19.md)) |
-| [mio-tts-cpp](https://github.com/mmnga/mio-tts-cpp) | mmnga | dedicated | — | 796 | 0.017 | 2.23 | — | C++ / GGML (no Python) | ~489 MB (0.1B Q8 + codec) | MIT (code; the MioTTS models are Apache-2.0) | yes | Pure C++ with a small footprint; ~0.7 s per sentence even on CPU. Normalise numbers first; may append extra words (values: C++ server) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [CosyVoice3 0.5B](https://github.com/FunAudioLLM/CosyVoice) | Alibaba (FunAudioLLM) | multilingual | yes | 450 | 0.013 | 3.39 | — | PyTorch, ONNX, CrispASR | 0.5B (full download ~9 GB) | Apache-2.0 | yes | Pass Japanese as katakana (kanji input gives CER 0.44). ~3.3 s per sentence with official PyTorch (values: CrispASR, katakana) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Supertonic3](https://github.com/supertone-inc/supertonic) | Supertone | multilingual | — | 91 | 0.022 | **4.18** | **69** | ONNX (C++ / C# / Go / Rust / Node, etc.), audio.cpp, CrispASR | 99M | Code MIT, model OpenRAIL-M | yes | Highest UTMOS. Set 4-8 threads for the Python ONNX build on CPU. Development ended 2026-07 (values: audio.cpp) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [Qwen3-TTS (0.6B / 1.7B)](https://github.com/QwenLM/Qwen3-TTS) | Alibaba (Qwen) | multilingual | yes | 679 | 0.006 | 4.00 | 92 | PyTorch, audio.cpp, speech.cpp, CrispASR | 0.6B / 1.7B | Apache-2.0 | yes | Voice instructions, design and cloning. 8-9 s per sentence with official PyTorch; 32-81 ms to first audio with speech.cpp. VoiceDesign (voice from a description) takes 0.71 s per sentence with audio.cpp, 25 ms to first audio (values: audio.cpp, 1.7B Base, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) | hexgrad | multilingual | yes | — | — | — | — | PyTorch, ONNX | 82M | Apache-2.0 | yes | Japanese phonemisation broke down; not usable ([results](benchmarks/tts/2026-08-19.md)) |
-| [Fish Audio S2 Pro](https://github.com/fishaudio/fish-speech) | Fish Audio | multilingual | yes | 2304 | 0.004 | 3.85 | 91 | PyTorch, audio.cpp | 4B (weights ~11 GB, VRAM 24 GB +) | Model: Fish Audio Research License (non-commercial; commercial use needs a separate licence). Code: Fish Audio Community License (commercial use under USD 500K annual revenue) | no | The PyTorch release does not fit a 12 GB GPU, but audio.cpp (Q8_0) runs it (values: audio.cpp, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [OmniVoice](https://huggingface.co/k2-fsa/OmniVoice) | k2-fsa | multilingual | — | 363 | **0.000** | 3.46 | 306 | PyTorch, audio.cpp, CrispASR | ~0.6B (Qwen3-0.6B based) | Code Apache-2.0, model CC-BY-NC | no | Multilingual cloning. ~1 s per sentence with PyTorch (values: audio.cpp, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [MioTTS (0.6B / 1.7B)](https://huggingface.co/Aratako/MioTTS-1.7B) | Aratako | dedicated | — | 806 | 0.006 | 3.28 | — | audio.cpp, CrispASR | 0.6B / 1.7B (+ MioCodec) | Apache-2.0 (MioCodec is MIT) | yes | Larger versions of the mio-tts-cpp model. Set temperature 0.8 for the CrispASR 0.6B (the default 0 runs on) (values: audio.cpp, 1.7B, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [VoxCPM2](https://huggingface.co/openbmb/VoxCPM2) | OpenBMB | multilingual | yes | 1368 | 0.011 | 3.66 | — | PyTorch, audio.cpp, CrispASR | — | Apache-2.0 | yes | Cloning in 30 languages. audio.cpp is faster (~0.8 s) but CER 0.068 (values: CrispASR, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [MOSS-TTS-Local v1.5](https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5) | OpenMOSS | multilingual | — | 1364 | 0.006 | 3.85 | — | PyTorch, CrispASR, audio.cpp | — | Apache-2.0 | yes | 9 GB of GPU memory; audio.cpp grows to 11.6 GB and takes ~10 s per sentence (values: CrispASR, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Higgs Audio TTS 3 4B](https://huggingface.co/bosonai/higgs-tts-3-4b) | Boson AI | multilingual | — | 1292 | 0.004 | 4.01 | 205 | PyTorch, audio.cpp | 4B | Research and non-commercial license | no | Accurate readings when cloning. Non-commercial (values: audio.cpp, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [Confucius4-TTS](https://huggingface.co/netease-youdao/Confucius4-TTS) | NetEase Youdao | multilingual | — | 2568 | 0.391 | 2.84 | 2338 | PyTorch, audio.cpp, CrispASR | — | Apache-2.0 | yes | Japanese readings broke down (also with CrispASR) (values: audio.cpp, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [OuteTTS 1.0 1B](https://huggingface.co/OuteAI/Llama-OuteTTS-1.0-1B) | OuteAI | multilingual | — | 23056 | 0.104 | 3.55 | — | PyTorch, llama.cpp, audio.cpp | 1B | CC-BY-NC-SA-4.0 | no | Slow with audio.cpp (~23 s per sentence) (values: audio.cpp, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
-| [ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) | Zyphra | multilingual | — | 270 | 0.017 | 3.26 | — | ggml (C++ server), PyTorch | ~1.2 GB GGUF set | Code MIT, weights Apache-2.0 | yes | Fast, but no number normalisation, so years and similar numbers are misread. ~225 ms per sentence with audio.cpp, 88 ms to first audio (values: ggml server) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [Kitten TTS 2](https://huggingface.co/KittenML/kitten-tts-2) | KittenML (Stellon Labs) | multilingual | — | 3065 | 0.013 | 1.60 | — | kittenml (PyTorch, vLLM) | ~1 GB weights | Stellon Labs Community License (commercial use requires registration, under USD 1M annual revenue and funding, attribution required) | conditional | Four Japanese voices with accurate readings. Slow with torch, ~0.9 s per sentence with audio.cpp (values: PyTorch) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [LFM2.5-Audio-1.5B-JP](https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-JP) | Liquid AI | dedicated | yes | 2535 | 0.006 | 3.72 | — | liquid-audio (PyTorch), audio.cpp, CrispASR | 1.5B (~3.5 GB weights) | LFM Open License v1.0 (commercial use allowed under USD 10M revenue) | conditional | TTS mode of a speech-to-speech model; single voice. ~0.33 s per sentence with audio.cpp, 51 ms to first audio. Also usable as ASR with audio.cpp (CER 0.035-0.249), while CrispASR loops on phrases (values: PyTorch) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [MOSS-TTS-Nano](https://github.com/OpenMOSS/MOSS-TTS-Nano) | OpenMOSS | multilingual | yes | 2499 | 0.137 | 1.50 | — | PyTorch, ONNX, audio.cpp | 0.1B | Apache-2.0 | yes | 0.1B model that runs on CPU. Frequent kanji misreadings (values: PyTorch) ([results](benchmarks/tts/2026-11-tts.md)) |
-| [Style-Bert-VITS2](https://github.com/litagin02/Style-Bert-VITS2) | litagin02 | dedicated | — | 114 | 0.002 | 2.61 | — | PyTorch, ONNX (AivisSpeech) | Per voice model (JP-Extra ~250 MB + BERT) | Code AGPL-3.0 / voices per model (the JVNV example voice is CC-BY-SA-4.0) | per voice/model | Fast and accurate (~1.3 s per sentence even on CPU). Voice and UTMOS depend on the trained model; AivisSpeech uses the same family (values: PyTorch, JVNV voice) ([results](benchmarks/2026-11-runtimes.md)) |
-| [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | RVC-Boss | multilingual | yes | 2084 | 0.011 | 3.88 | 382 | PyTorch | v2ProPlus (~1.4 GB of weights) | MIT | yes | Zero-shot cloning from ~5 s of reference audio (speaker similarity 0.96) (values: PyTorch, cloning) ([results](benchmarks/2026-11-runtimes.md)) |
+| Model | Streaming | ms/sentence | Reading CER | UTMOS | First audio ms | Runtime | Commercial | Notes |
+|---|---|---:|---:|---:|---:|---|---|---|
+| [AivisSpeech](https://github.com/Aivis-Project/AivisSpeech-Engine) | — | 408 | 0.004 | 3.85 | — | standalone engine + HTTP API (no Python) | per voice/model | Easy to install with accurate readings; time varies little with sentence length. ~1.8 s per sentence on CPU |
+| [VOICEVOX](https://github.com/VOICEVOX/voicevox_engine) | — | **53** | **0.000** | 2.74 | — | standalone engine + HTTP API, voicevox_core (C API / Python) | per voice/model | The Japanese standard: fastest with no reading errors, ~500 ms even on CPU (8 threads). UTMOS depends on the voice. Terms differ per voice |
+| [Irodori-TTS v4.1 Small](https://github.com/Aratako/Irodori-TTS) | — | 1334 | **0.000** | 3.45 | — | PyTorch, audio.cpp, speech.cpp | yes | Voice design from a caption, plus cloning. ~0.8 s with the official fast setting (6 steps, sway). With audio.cpp, v4 Small takes ~0.4 s and v4.1 Small MF ~0.2 s |
+| [Tsukasa Speech](https://github.com/Respaired/Tsukasa-Speech) | — | — | — | — | — | PyTorch | no | Very fast (RTF 0.015), anime style. Non-commercial; hard to install |
+| [mio-tts-cpp](https://github.com/mmnga/mio-tts-cpp) | — | 796 | 0.017 | 2.23 | — | C++ / GGML (no Python) | yes | Pure C++ with a small footprint; ~0.7 s per sentence even on CPU. Normalise numbers first; may append extra words |
+| [CosyVoice3 0.5B](https://github.com/FunAudioLLM/CosyVoice) | yes | 450 | 0.013 | 3.39 | — | PyTorch, ONNX, CrispASR | yes | Pass Japanese as katakana (kanji input gives CER 0.44). ~3.3 s per sentence with official PyTorch |
+| [Supertonic3](https://github.com/supertone-inc/supertonic) | — | 91 | 0.022 | **4.18** | **69** | ONNX (C++ / C# / Go / Rust / Node, etc.), audio.cpp, CrispASR | yes | Highest UTMOS. Set 4-8 threads for the Python ONNX build on CPU. Development ended 2026-07 |
+| [Qwen3-TTS (0.6B / 1.7B)](https://github.com/QwenLM/Qwen3-TTS) | yes | 679 | 0.006 | 4.00 | 92 | PyTorch, audio.cpp, speech.cpp, CrispASR | yes | Voice instructions, design and cloning. 8-9 s per sentence with official PyTorch; 32-81 ms to first audio with speech.cpp. VoiceDesign (voice from a description) takes 0.71 s per sentence with audio.cpp, 25 ms to first audio |
+| [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) | yes | — | — | — | — | PyTorch, ONNX | yes | Japanese phonemisation broke down; not usable |
+| [Fish Audio S2 Pro](https://github.com/fishaudio/fish-speech) | yes | 2304 | 0.004 | 3.85 | 91 | PyTorch, audio.cpp | no | The PyTorch release does not fit a 12 GB GPU, but audio.cpp (Q8_0) runs it |
+| [OmniVoice](https://huggingface.co/k2-fsa/OmniVoice) | — | 363 | **0.000** | 3.46 | 306 | PyTorch, audio.cpp, CrispASR | no | Multilingual cloning. ~1 s per sentence with PyTorch |
+| [MioTTS (0.6B / 1.7B)](https://huggingface.co/Aratako/MioTTS-1.7B) | — | 806 | 0.006 | 3.28 | — | audio.cpp, CrispASR | yes | Larger versions of the mio-tts-cpp model. Set temperature 0.8 for the CrispASR 0.6B (the default 0 runs on) |
+| [VoxCPM2](https://huggingface.co/openbmb/VoxCPM2) | yes | 1368 | 0.011 | 3.66 | — | PyTorch, audio.cpp, CrispASR | yes | Cloning in 30 languages. audio.cpp is faster (~0.8 s) but CER 0.068 |
+| [MOSS-TTS-Local v1.5](https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5) | — | 1364 | 0.006 | 3.85 | — | PyTorch, CrispASR, audio.cpp | yes | 9 GB of GPU memory; audio.cpp grows to 11.6 GB and takes ~10 s per sentence |
+| [Higgs Audio TTS 3 4B](https://huggingface.co/bosonai/higgs-tts-3-4b) | — | 1292 | 0.004 | 4.01 | 205 | PyTorch, audio.cpp | no | Accurate readings when cloning. Non-commercial |
+| [Confucius4-TTS](https://huggingface.co/netease-youdao/Confucius4-TTS) | — | 2568 | 0.391 | 2.84 | 2338 | PyTorch, audio.cpp, CrispASR | yes | Japanese readings broke down (also with CrispASR) |
+| [OuteTTS 1.0 1B](https://huggingface.co/OuteAI/Llama-OuteTTS-1.0-1B) | — | 23056 | 0.104 | 3.55 | — | PyTorch, llama.cpp, audio.cpp | no | Slow with audio.cpp (~23 s per sentence) |
+| [ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) | — | 270 | 0.017 | 3.26 | — | ggml (C++ server), PyTorch | yes | Fast, but no number normalisation, so years and similar numbers are misread. ~225 ms per sentence with audio.cpp, 88 ms to first audio |
+| [Kitten TTS 2](https://huggingface.co/KittenML/kitten-tts-2) | — | 3065 | 0.013 | 1.60 | — | kittenml (PyTorch, vLLM) | conditional | Four Japanese voices with accurate readings. Slow with torch, ~0.9 s per sentence with audio.cpp |
+| [LFM2.5-Audio-1.5B-JP](https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B-JP) | yes | 2535 | 0.006 | 3.72 | — | liquid-audio (PyTorch), audio.cpp, CrispASR | conditional | TTS mode of a speech-to-speech model; single voice. ~0.33 s per sentence with audio.cpp, 51 ms to first audio. Also usable as ASR with audio.cpp (CER 0.035-0.249), while CrispASR loops on phrases |
+| [MOSS-TTS-Nano](https://github.com/OpenMOSS/MOSS-TTS-Nano) | yes | 2499 | 0.137 | 1.50 | — | PyTorch, ONNX, audio.cpp | yes | 0.1B model that runs on CPU. Frequent kanji misreadings |
+| [Style-Bert-VITS2](https://github.com/litagin02/Style-Bert-VITS2) | — | 114 | 0.002 | 2.61 | — | PyTorch, ONNX (AivisSpeech) | per voice/model | Fast and accurate (~1.3 s per sentence even on CPU). Voice and UTMOS depend on the trained model; AivisSpeech uses the same family |
+| [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | yes | 2084 | 0.011 | 3.88 | 382 | PyTorch | yes | Zero-shot cloning from ~5 s of reference audio (speaker similarity 0.96) |
 
 ## LLM
 
-For knowledge and reasoning in Japanese, see the [Nejumi LLM Leaderboard](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA) and the [Swallow LLM Leaderboard](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html). Here we measure what matters in spoken dialogue: time to the first token and generation speed.
+For knowledge and reasoning see the [Nejumi](https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA) and [Swallow](https://swallow-llm.github.io/swallow-leaderboard-v2.en.html) leaderboards. Here we measure time to first token and generation speed.
 
-| Model | Developer | Japanese | Streaming | Runtime | Size | License | Commercial | Notes |
-|---|---|---|---|---|---|---|---|---|
-| [LFM2.5 1.2B JP](https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606) | Liquid AI | multilingual | yes | LM Studio, llama.cpp (GGUF) | 1.2B | LFM Open License v1.0 (commercial use allowed under USD 10M revenue) | conditional | Fastest we measured (TTFT 39 ms, 215 tok/s at Q8_0) ([results](benchmarks/llm/2026-11-lmstudio.md)) |
-| [ELYZA-Shortcut-1.0-Qwen-7B](https://huggingface.co/elyza/ELYZA-Shortcut-1.0-Qwen-7B) | ELYZA | multilingual | yes | LM Studio, llama.cpp (GGUF) | 7B | Apache-2.0 | yes | Japanese model from ELYZA (Qwen-based); TTFT 45 ms despite 7B ([results](benchmarks/llm/2026-11-lmstudio.md)) |
-| [Qwen3.5（0.8B / 4B / 9B）](https://huggingface.co/Qwen/Qwen3.5-9B) | Alibaba (Qwen) | multilingual | yes | LM Studio, llama.cpp (GGUF) | 0.8B / 4B / 9B | Apache-2.0 | yes | Turn thinking off (reasoning_effort none); 9B: TTFT 107 ms, 56 tok/s ([results](benchmarks/llm/2026-11-lmstudio.md)) |
-| [Gemma 4（E2B / E4B / 12B / 26B-A4B）](https://huggingface.co/google/gemma-4-26B-A4B-it) | Google | multilingual | yes | LM Studio, llama.cpp (GGUF) | 2B-26B (26B is MoE, 4B active) | Apache-2.0 | yes | The 26B-A4B MoE beats the dense 12B (TTFT 103 ms, 94 tok/s); turn thinking off for 12B QAT ([results](benchmarks/llm/2026-11-lmstudio.md)) |
-| [LLM-jp-4 8B Instruct](https://huggingface.co/llm-jp/llm-jp-4-8b-instruct) | NII LLM-jp | multilingual | yes | LM Studio, llama.cpp (GGUF) | 8B | Apache-2.0 | yes | Japanese-centric model from Japan; TTFT 101 ms, 63 tok/s ([results](benchmarks/llm/2026-11-lmstudio.md)) |
-| [Nemotron Nano 9B v2 Japanese](https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese) | NVIDIA | multilingual | yes | LM Studio, llama.cpp (GGUF) | 9B | NVIDIA Nemotron Open Model License (commercial use allowed) | yes | Thinking cannot be turned off via the API; ~1.5 s to reply even with /no_think ([results](benchmarks/llm/2026-11-lmstudio.md)) |
+| Model | Streaming | Runtime | Commercial | Notes |
+|---|---|---|---|---|
+| [LFM2.5 1.2B JP](https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606) | yes | LM Studio, llama.cpp (GGUF) | conditional | Fastest we measured (TTFT 39 ms, 215 tok/s at Q8_0) |
+| [ELYZA-Shortcut-1.0-Qwen-7B](https://huggingface.co/elyza/ELYZA-Shortcut-1.0-Qwen-7B) | yes | LM Studio, llama.cpp (GGUF) | yes | Japanese model from ELYZA (Qwen-based); TTFT 45 ms despite 7B |
+| [Qwen3.5（0.8B / 4B / 9B）](https://huggingface.co/Qwen/Qwen3.5-9B) | yes | LM Studio, llama.cpp (GGUF) | yes | Turn thinking off (reasoning_effort none); 9B: TTFT 107 ms, 56 tok/s |
+| [Gemma 4（E2B / E4B / 12B / 26B-A4B）](https://huggingface.co/google/gemma-4-26B-A4B-it) | yes | LM Studio, llama.cpp (GGUF) | yes | The 26B-A4B MoE beats the dense 12B (TTFT 103 ms, 94 tok/s); turn thinking off for 12B QAT |
+| [LLM-jp-4 8B Instruct](https://huggingface.co/llm-jp/llm-jp-4-8b-instruct) | yes | LM Studio, llama.cpp (GGUF) | yes | Japanese-centric model from Japan; TTFT 101 ms, 63 tok/s |
+| [Nemotron Nano 9B v2 Japanese](https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese) | yes | LM Studio, llama.cpp (GGUF) | yes | Thinking cannot be turned off via the API; ~1.5 s to reply even with /no_think |
 
-## Spoken dialogue (VAD, turn-taking, backchannels)
+## Spoken dialogue
 
-| Model | Developer | Japanese | Streaming | Runtime | Size | License | Commercial | Notes |
-|---|---|---|---|---|---|---|---|---|
-| [Silero VAD](https://github.com/snakers4/silero-vad) | Silero | multilingual | yes | PyTorch, ONNX | ~2 MB | MIT | yes | The standard voice activity detector |
-| [MaAI](https://github.com/MaAI-Kyoto/MaAI) | Kyoto University | dedicated | yes | PyTorch | — | MIT | yes | VAP-based turn-taking, backchannel and nod prediction |
-| [Smart Turn](https://github.com/pipecat-ai/smart-turn) | Pipecat | multilingual | — | PyTorch, ONNX | — | BSD-2-Clause | yes | Detects end of turn from audio |
+Voice activity detection, turn-taking, backchannels and more.
+
+| Model | Streaming | Runtime | Commercial | Notes |
+|---|---|---|---|---|
+| [Silero VAD](https://github.com/snakers4/silero-vad) | yes | PyTorch, ONNX | yes | The standard voice activity detector |
+| [MaAI](https://github.com/MaAI-Kyoto/MaAI) | yes | PyTorch | yes | VAP-based turn-taking, backchannel and nod prediction |
+| [Smart Turn](https://github.com/pipecat-ai/smart-turn) | — | PyTorch, ONNX | yes | Detects end of turn from audio |
 
 ## Runtimes
 
-The runtimes compared in the benchmarks. The same model can differ a lot in speed and memory depending on the runtime ([runtime comparison](benchmarks/2026-11-runtimes.md)).
-
 | Runtime | What it is | For |
 |---|---|---|
-| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Speech recognition and synthesis on ONNX Runtime, with many fast int8 builds for CPU | ASR, TTS, VAD |
-| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Fast Whisper-family inference on CTranslate2 | ASR |
-| [CrispASR](https://github.com/CrispStrobe/CrispASR) | C++ runtime and server running many ASR and TTS models on ggml | ASR, TTS |
-| [audio.cpp](https://github.com/0xShug0/audio.cpp) | C++ server running ASR and TTS on ggml, with streaming | ASR, TTS |
-| [speech.cpp](https://github.com/nyosegawa/speech.cpp) | C++ runtime for ASR and TTS on ggml; uses Vulkan for the GPU on Windows | ASR, TTS |
-| [llama.cpp](https://github.com/ggml-org/llama.cpp), [LM Studio](https://lmstudio.ai) | Run GGUF LLMs | LLM |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | ONNX Runtime; many fast int8 builds for CPU | ASR, TTS, VAD |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) | Fast Whisper on CTranslate2 | ASR |
+| [CrispASR](https://github.com/CrispStrobe/CrispASR) | C++ runtime and server on ggml | ASR, TTS |
+| [audio.cpp](https://github.com/0xShug0/audio.cpp) | C++ server on ggml, with streaming | ASR, TTS |
+| [speech.cpp](https://github.com/nyosegawa/speech.cpp) | C++ runtime on ggml; Vulkan GPU on Windows | ASR, TTS |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp), [LM Studio](https://lmstudio.ai) | GGUF LLMs | LLM |
 
-Setup steps are in [docs/runtimes.md](docs/runtimes.md).
+Setup: [docs/runtimes.md](docs/runtimes.md).
 
 ## Try it
 
-- [examples/asr/](examples/asr/) - Minimal per-model scripts that transcribe one WAV file.
-- [apps/](apps/README.md) - An ASR app that recognises your microphone and a TTS app that reads text with a chosen engine and voice (desktop and browser versions). Every benchmarked configuration, including each runtime, can be selected. Install steps are there too.
+- [apps/](apps/README.md): an ASR app for your microphone and a TTS app (desktop and browser). Every measured configuration can be selected
+- [examples/asr/](examples/asr/): minimal per-model scripts that transcribe one WAV file
 
 ## Benchmarks
 
-| What | Page |
-|---|---|
-| Speed, accuracy and memory of the same model across runtimes, streaming latency, TTS naturalness, LLM runtimes | [Runtime comparison](benchmarks/2026-11-runtimes.md) |
-| ASR accuracy (FLEURS, ReazonSpeech, Common Voice, free conversation) | [ASR accuracy](benchmarks/asr/2026-11-3sets.md) |
-| ASR latency (the same 100 utterances on GPU and CPU) | [ASR latency](benchmarks/asr/2026-11-timing.md) |
-| TTS synthesis time and reading accuracy (20 sentences) | [TTS](benchmarks/tts/2026-11-tts.md) |
-| LLM reply latency (LM Studio) | [LLM](benchmarks/llm/2026-11-lmstudio.md) |
+- [Runtime comparison](benchmarks/2026-11-runtimes.md): speed, accuracy, memory, streaming latency, TTS naturalness, LLM runtimes
+- [ASR accuracy](benchmarks/asr/2026-11-3sets.md) · [ASR latency](benchmarks/asr/2026-11-timing.md) · [TTS](benchmarks/tts/2026-11-tts.md) · [LLM](benchmarks/llm/2026-11-lmstudio.md)
+- Methods and test machine: [benchmarks/README.md](benchmarks/README.md)
 
-Methods, the test machine and earlier results are in [benchmarks/README.md](benchmarks/README.md).
+## Contributing and license
 
-## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) (tables are generated from `data/models.toml`; do not edit the README). This repository is [MIT](LICENSE); listed models and datasets follow their own licenses. Licenses were checked on the official pages on 2026-11-21; the commercial column is a guide, not legal advice.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The tables are generated from `data/models.toml`; do not edit the README directly.
-
-## License
-
-This repository (the list, benchmark results and code) is [MIT](LICENSE). The listed models and datasets follow their own licenses.
-
-## Footnotes
-
-- Licenses were checked against each official page (model card, repository and license text) on 2026-11-21. They can change, so check the official page before use. The commercial column is a guide, not legal advice. "conditional" means commercial use is allowed under conditions such as a revenue cap; "unknown" means no license is stated.
-- Related: [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS) - A spoken dialogue system where many of these models are integrated and tested.
+Related: [MaAI-SDS](https://github.com/kazu44ttaka/MaAI-SDS), a spoken dialogue system integrating many of these models.
